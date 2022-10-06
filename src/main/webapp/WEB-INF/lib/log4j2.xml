@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="WARN" monitorInterval="30">
+ 
+    <Properties>
+        <Property name="LOG_PATTERN">%d{yyyy-MM-dd'T'HH:mm:ss.SSSZ} %p %m%n</Property>
+		<Property name="APP_LOG_ROOT">/opt/glassfish5/glassfish/domains/domain1/logs</Property>
+    </Properties>
+ 
+    <Appenders>
+ 
+        <Console name="Console" target="SYSTEM_OUT" follow="true">
+            <PatternLayout pattern="${LOG_PATTERN}"/>
+        </Console>
+         
+        <RollingFile name="remedyRequestsLog" fileName="${sys:APP_LOG_ROOT}/remedy_requests.log"
+            filePattern="${sys:APP_LOG_ROOT}/remedy_requests-%d{yyyy-MM-dd}-%i.log">
+            <PatternLayout pattern="${LOG_PATTERN}"/>
+            <Policies>
+                <SizeBasedTriggeringPolicy size="19500KB" />
+            </Policies>
+            <DefaultRolloverStrategy max="10"/>
+        </RollingFile>
+
+        <RollingFile name="nluRequestsLog" fileName="${sys:APP_LOG_ROOT}/nlu_requests.log"
+            filePattern="${sys:APP_LOG_ROOT}/nlu_requests-%d{yyyy-MM-dd}-%i.log">
+            <PatternLayout pattern="${LOG_PATTERN}"/>
+            <Policies>
+                <SizeBasedTriggeringPolicy size="19500KB" />
+            </Policies>
+            <DefaultRolloverStrategy max="10"/>
+        </RollingFile>     
+         
+        <RollingFile name="test_nluRequestsLog" fileName="${sys:APP_LOG_ROOT}/Test_nlu_requests.log"
+            filePattern="${sys:APP_LOG_ROOT}/Test_nlu_requests-%d{yyyy-MM-dd}-%i.log">
+            <PatternLayout pattern="${LOG_PATTERN}"/>
+            <Policies>
+                <SizeBasedTriggeringPolicy size="19500KB" />
+            </Policies>
+            <DefaultRolloverStrategy max="10"/>
+        </RollingFile>           
+         
+    </Appenders>
+ 
+    <Loggers>
+     
+        <Logger name="gr.wind.spectra.business.CLIOutage" additivity="false" level="info">
+            <AppenderRef ref="nluRequestsLog" />
+        </Logger>
+
+		<Logger name="gr.wind.spectra.business.Test_CLIOutage" additivity="false" level="info">
+            <AppenderRef ref="test_nluRequestsLog" />
+        </Logger>
+
+        <Logger name="gr.wind.spectra.web.WebSpectra" additivity="false" level="info">
+            <AppenderRef ref="remedyRequestsLog" />
+        </Logger>
+
+        <Logger name="gr.wind.spectra.business.DB_Operations" additivity="false" level="info">
+            <AppenderRef ref="remedyRequestsLog" />
+        </Logger>
+
+        <Logger name="gr.wind.spectra.business.s_DB_Operations" additivity="false" level="info">
+            <AppenderRef ref="remedyRequestsLog" />
+        </Logger>
+
+
+        <Logger name="gr.wind.spectra.business.DB_Connection" additivity="false" level="info">
+            <AppenderRef ref="remedyRequestsLog" />
+        </Logger>
+
+        <Logger name="gr.wind.spectra.business.s_DB_Connection" additivity="false" level="info">
+            <AppenderRef ref="remedyRequestsLog" />
+        </Logger>
+
+
+        <Logger name="gr.wind.spectra.business.MyDataSource" additivity="false" level="info">
+            <AppenderRef ref="remedyRequestsLog" />
+        </Logger>
+
+        <Logger name="gr.wind.spectra.business.s_MyDataSource" additivity="false" level="info">
+            <AppenderRef ref="remedyRequestsLog" />
+        </Logger>
+
+        <Logger name="gr.wind.spectra.business.Help_Func" additivity="false" level="info">
+            <AppenderRef ref="Console" />
+        </Logger>
+                 
+        <Root level="all">
+            <AppenderRef ref="Console"/>
+        </Root>
+ 
+    </Loggers>
+ 
+</Configuration>
