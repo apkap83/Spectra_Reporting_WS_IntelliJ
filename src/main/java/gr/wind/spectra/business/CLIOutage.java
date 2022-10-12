@@ -107,6 +107,95 @@ public class CLIOutage
 		return newHierarchyValue;
 	}
 
+	public ProductOfNLUActive checkAdHocOutage(String RequestID, String CLIProvided) throws SQLException, ParseException
+	{
+		ProductOfNLUActive ponla = new ProductOfNLUActive();
+		Help_Func hf = new Help_Func();
+
+		// Check if CLI is affected by AdHoc Outage
+		// Get Lines with CliValue = CLIProvided
+		ResultSet myRS = null;
+		myRS = s_dbs.getRows("AdHocOutage_CLIS",
+				new String[] { "CliValue", "Start_DateTime", "End_DateTime", "BackupEligible", "Message" },
+				new String[] { "CliValue" }, new String[] { CLIProvided }, new String[] { "String" });
+
+		while (myRS.next())
+		{
+			String AdHoc_CliValue = myRS.getString("CliValue").trim();
+			Date AdHoc_StartTime = myRS.getTimestamp("Start_DateTime");
+			Date AdHoc_EndTime = myRS.getTimestamp("End_DateTime");
+			String BackupEligible = myRS.getString("BackupEligible").trim();
+			String adHocMessage = myRS.getString("Message").trim();
+
+			// If it's null it's msg2
+			if (adHocMessage == null)
+			{
+				adHocMessage = "msg2";
+			}
+
+			// Backup Eligible response should be "Y" or "N"
+			if (BackupEligible == "Yes")
+			{
+				BackupEligible = "Y";
+			} else
+			{
+				BackupEligible = "N";
+			}
+
+			// Get current date
+			LocalDateTime now = LocalDateTime.now();
+
+			// Convert StartTime date to LocalDateTime object
+			LocalDateTime StartTimeInLocalDateTime = Instant.ofEpochMilli(AdHoc_StartTime.getTime())
+					.atZone(ZoneId.systemDefault()).toLocalDateTime();
+
+			// Convert EndTime date to LocalDateTime object
+			LocalDateTime EndTimeInLocalDateTime = Instant.ofEpochMilli(AdHoc_EndTime.getTime())
+					.atZone(ZoneId.systemDefault()).toLocalDateTime();
+
+			// if Start time is after NOW and End Time is Before NOW then we have outage
+			if (now.isAfter(StartTimeInLocalDateTime) && now.isBefore(EndTimeInLocalDateTime))
+			{
+				logger.debug(
+						"ReqID: " + RequestID + " - AdHoc Incident for CliValue " + AdHoc_CliValue + " is ongoing");
+
+				// Convert End DateTime to String
+				String AdHoc_EndTimeString = "";
+				DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+				AdHoc_EndTimeString = dateFormat.format(AdHoc_EndTime);
+
+				ponla = new ProductOfNLUActive(this.requestID, CLIProvided, "Yes", "AdHoc_Outage", "Critical",
+						"Voice|Data|IPTV", "Yes", null, AdHoc_EndTimeString, "LoS", adHocMessage, BackupEligible,
+						"NULL");
+
+				logger.info("SysID: " + systemID + " ReqID: " + RequestID + " - Found Affected CLI: " + CLIProvided
+						+ " from AdHoc Outage - Message: " + adHocMessage + " | Backup: " + BackupEligible);
+
+				// Update Statistics
+				s_dbs.updateUsageStatisticsForMethod("AdHoc_Pos");
+
+				// Update asynchronously - Add Caller to Caller data table (Caller_Data) with empty values for IncidentID, Affected Services & Scheduling
+				Update_CallerDataTable ucdt = new Update_CallerDataTable(dbs, s_dbs, CLIProvided, "AdHoc_Outage",
+						"Voice|Data|IPTV", "Yes", adHocMessage, BackupEligible, RequestID, systemID);
+				ucdt.run();
+
+				// Update asynchronously Stats_Pos_NLU_Requests to count number of successful NLU requests per CLI
+				Update_ReallyAffectedTable uRat = new Update_ReallyAffectedTable(s_dbs, "AdHoc_Outage",
+						"Voice|Data|IPTV", "Yes", CLIProvided);
+				uRat.run();
+
+				return ponla;
+			} else
+			{
+				logger.debug(
+						"ReqID: " + RequestID + " - AdHoc Incident for CliValue " + AdHoc_CliValue + " is NOT ongoing");
+				continue;
+			}
+
+		}
+
+		return null;
+	}
 	public ProductOfNLUActive checkCLIOutage(String RequestID, String CLIProvided, String ServiceType)
 			throws SQLException, InvalidInputException, ParseException
 	{
@@ -119,6 +208,13 @@ public class CLIOutage
 		String allAffectedServices = "";
 
 		Help_Func hf = new Help_Func();
+
+		// Check if we have Ad-Hoc Outage from Table: AdHocOutage_CLIS
+		ProductOfNLUActive ponla_AdHoc = checkAdHocOutage(RequestID, CLIProvided);
+		if (ponla_AdHoc != null)
+		{
+			return ponla_AdHoc;
+		}
 
 		// Check if we have at least one OPEN incident
 		boolean weHaveOpenIncident = s_dbs.checkIfStringExistsInSpecificColumn("SubmittedIncidents", "IncidentStatus",

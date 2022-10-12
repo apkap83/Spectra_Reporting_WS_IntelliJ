@@ -525,8 +525,8 @@ public class WebSpectra implements InterfaceWebSpectra
 			String[] servicesAffected = AffectedServices.split("\\|");
 
 			/**
-			 * 	•	Exception 1 : RootHierarchyNode = Wind_FTTX , HierarchyTableNamePath : 'OltElementName->OltSlot->OltPort->Onu
-			 *	•	Exception 2 : RootHierarchyNode = FTTC_Location_Element , HierarchyTableNamePath : Site Name
+			 * 	Exception 1 : RootHierarchyNode = Wind_FTTX , HierarchyTableNamePath : 'OltElementName->OltSlot->OltPort->Onu
+			 *	Exception 2 : RootHierarchyNode = FTTC_Location_Element , HierarchyTableNamePath : Site Name
 			 */
 			hf.declineSubmissionOnCertainHierarchyLevels(myHier);
 
