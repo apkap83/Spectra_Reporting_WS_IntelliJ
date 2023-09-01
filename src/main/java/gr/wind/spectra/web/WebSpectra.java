@@ -14,28 +14,25 @@ import javax.jws.Oneway;
 import javax.jws.WebMethod;
 import javax.jws.WebParam;
 import javax.jws.WebParam.Mode;
+import javax.jws.WebResult;
 import javax.jws.WebService;
 import javax.servlet.http.HttpServletRequest;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.ws.WebServiceContext;
 import javax.xml.ws.handler.MessageContext;
 
+import gr.wind.spectra.model.*;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import gr.wind.spectra.business.CLIOutage;
 import gr.wind.spectra.business.DB_Connection;
 import gr.wind.spectra.business.DB_Operations;
 import gr.wind.spectra.business.Help_Func;
 import gr.wind.spectra.business.IncidentOutageToCSV;
 import gr.wind.spectra.business.OpenningIncidentOutageToCSV;
+import gr.wind.spectra.business.CLIOutage;
 import gr.wind.spectra.business.s_DB_Connection;
 import gr.wind.spectra.business.s_DB_Operations;
-import gr.wind.spectra.model.ProductOfCloseOutage;
-import gr.wind.spectra.model.ProductOfGetHierarchy;
-import gr.wind.spectra.model.ProductOfGetOutage;
-import gr.wind.spectra.model.ProductOfModify;
-import gr.wind.spectra.model.ProductOfSubmission;
 
 @WebService(endpointInterface = "gr.wind.spectra.web.InterfaceWebSpectra")
 public class WebSpectra implements InterfaceWebSpectra
@@ -83,8 +80,6 @@ public class WebSpectra implements InterfaceWebSpectra
 			} catch (Exception ex)
 			{
 				logger.fatal("Could not open connection with database!");
-				//throw new Exception(ex.getMessage());
-				return;
 			}
 		}
 
@@ -98,8 +93,6 @@ public class WebSpectra implements InterfaceWebSpectra
 			} catch (Exception ex)
 			{
 				logger.fatal("Could not open connection with database!");
-				//throw new Exception(ex.getMessage());
-				return;
 			}
 		}
 
@@ -185,7 +178,6 @@ public class WebSpectra implements InterfaceWebSpectra
 				// Get Hierarchy data in style :
 				// OltElementName->OltSlot->OltPort->Onu->ElementName->Slot
 				String fullHierarchyFromDB = dbs.getOneValue("HierarchyTablePerTechnology2", "HierarchyTableNamePath",
-
 						new String[] { "RootHierarchyNode" }, new String[] { rootElementInHierarchy },
 						new String[] { "String" });
 
@@ -312,8 +304,7 @@ public class WebSpectra implements InterfaceWebSpectra
 			//return prodElementsList;
 		} catch (Exception e)
 		{
-			//throw e;
-			return;
+
 		} finally
 		{
 			// Send Similar request to Spectra_Reporting server
@@ -340,7 +331,6 @@ public class WebSpectra implements InterfaceWebSpectra
 				{
 					s_conObj.closeDBConnection();
 				}
-
 				conn = null;
 				conObj = null;
 				dbs = null;
@@ -378,7 +368,6 @@ public class WebSpectra implements InterfaceWebSpectra
 			@WebParam(name = "Impact") @XmlElement(required = true) String Impact,
 			@WebParam(name = "Priority") @XmlElement(required = true) String Priority,
 			@WebParam(name = "HierarchySelected") @XmlElement(required = true) String HierarchySelected)
-
 	{
 		Logger logger = LogManager.getLogger(gr.wind.spectra.web.WebSpectra.class.getName());
 		Connection conn = null;
@@ -417,8 +406,7 @@ public class WebSpectra implements InterfaceWebSpectra
 			} catch (Exception ex)
 			{
 				logger.fatal("Could not open connection with database!");
-				//throw new Exception(ex.getMessage());
-				return;
+				return; //throw new Exception(ex.getMessage());
 			}
 		}
 
@@ -452,8 +440,7 @@ public class WebSpectra implements InterfaceWebSpectra
 				logger.error(req.getRemoteAddr() + " - ReqID: " + RequestID
 						+ "Submit Outage: - Wrong credentials provided - UserName: " + UserName + " Password: "
 						+ Password);
-				//throw new InvalidInputException("User name or Password incorrect!", "Error 100");
-				return;
+				return; //throw new InvalidInputException("User name or Password incorrect!", "Error 100");
 			}
 
 			// Check if Required fields are not empty and they contain the desired values
@@ -486,17 +473,15 @@ public class WebSpectra implements InterfaceWebSpectra
 			{
 				if (hf.checkIfEmpty("EndTime", EndTime))
 				{
-					//throw new InvalidInputException("Scheduled incidents should always contain Start Time and End Time",
-					//		"Error 172");
-					return;
+					return; //throw new InvalidInputException("Scheduled incidents should always contain Start Time and End Time",
+					//	"Error 172");
 				}
 			} else if (Scheduled.equals("No")) // If the submitted incident is NON scheduled then it should NOT contain "EndTime"
 			{
 				if (!hf.checkIfEmpty("EndTime", EndTime))
 				{
-					//throw new InvalidInputException(
+					return; //throw new InvalidInputException(
 					//	"Non scheduled incidents should not contain End Time during submission", "Error 173");
-					return;
 				}
 			}
 
@@ -548,16 +533,14 @@ public class WebSpectra implements InterfaceWebSpectra
 					// Backup Eligible - Addition of 23 Apr 2021
 					if (Impact.equals("LoS") && (service.equals("Voice") || service.equals("Data")))
 					{
-						// Disable Backup Eligibility - Request of Michanetzoglou 17 Nov 2021
 						backupEligible = "Yes";
 					}
 
 					// If the sumbission contains only root hierarchy then STOP submission
 					if (!myHier.get(i).contains("="))
 					{
-						//throw new InvalidInputException("Cannot submit Incident for an invalid/root only hierarchy",
-						//		"Error 900");
-						return;
+						return; //throw new InvalidInputException("Cannot submit Incident for an invalid/root only hierarchy",
+						//	"Error 900");
 					}
 
 					// Check Hierarchy Format Key_Value Pairs
@@ -575,21 +558,18 @@ public class WebSpectra implements InterfaceWebSpectra
 
 					// Check Columns of Hierarchy against fullHierarchy (avoid wrong key values in
 					// hierarchy e.g. SiteNa7me=AKADIMIAS)
-					hf.checkColumnsOfHierarchyVSFullHierarchy(myHier.get(i).toString(), fullHierarchyFromDB);
+//					hf.checkColumnsOfHierarchyVSFullHierarchy(myHier.get(i).toString(), fullHierarchyFromDB);
 
 					// Determine Tables for Data/Voice subscribers
 					String dataSubsTable = dbs.getOneValue("HierarchyTablePerTechnology2", "DataSubscribersTableName",
-
 							new String[] { "RootHierarchyNode" }, new String[] { rootHierarchySelected },
 							new String[] { "String" });
 
 					String IPTVSubsTable = dbs.getOneValue("HierarchyTablePerTechnology2", "IPTVSubscribersTableName",
-
 							new String[] { "RootHierarchyNode" }, new String[] { rootHierarchySelected },
 							new String[] { "String" });
 
 					String voiceSubsTable = dbs.getOneValue("HierarchyTablePerTechnology2", "VoiceSubscribersTableName",
-
 							new String[] { "RootHierarchyNode" }, new String[] { rootHierarchySelected },
 							new String[] { "String" });
 
@@ -617,99 +597,133 @@ public class WebSpectra implements InterfaceWebSpectra
 							new String[] { "RootHierarchyNode" }, new String[] { rootHierarchySelected },
 							new String[] { "String" });
 
-					// Count distinct values of Usernames or CliVlaues in the respective columns
-					String dataCustomersAffected = dbs.countDistinctRowsForSpecificColumnsNGAIncluded(dataSubsTable,
-							new String[] { "PASPORT_COID" },
-							hf.hierarchyKeys(hf.replaceHierarchyForSubscribersAffected(myHier.get(i).toString(),
-									fullDataHierarchyPathSplit)),
-							hf.hierarchyValues(hf.replaceHierarchyForSubscribersAffected(myHier.get(i).toString(),
-									fullDataHierarchyPathSplit)),
-							hf.hierarchyStringTypes(hf.replaceHierarchyForSubscribersAffected(myHier.get(i).toString(),
-									fullDataHierarchyPathSplit)),
-							ngaTypes);
+					String voiceCustomersAffected = "0";
+					String dataCustomersAffected = "0";
+					String IPTVCustomersAffected = "0";
 
-					// Count distinct values of Usernames or CliVlaues in the respective columns
-					String IPTVCustomersAffected = dbs.countDistinctRowsForSpecificColumnsNGAIncluded(IPTVSubsTable,
-							new String[] { "PASPORT_COID" },
-							hf.hierarchyKeys(hf.replaceHierarchyForSubscribersAffected(myHier.get(i).toString(),
-									fullIPTVHierarchyPathSplit)),
-							hf.hierarchyValues(hf.replaceHierarchyForSubscribersAffected(myHier.get(i).toString(),
-									fullIPTVHierarchyPathSplit)),
-							hf.hierarchyStringTypes(hf.replaceHierarchyForSubscribersAffected(myHier.get(i).toString(),
-									fullIPTVHierarchyPathSplit)),
-							ngaTypes);
+					// For Massive TV Outage Only...
+					if (rootHierarchySelected.startsWith(Massive_TV_Outage.Massive_TV_Outage.getDisplayName())) {
+						// KARFWTAAA
+						ngaTypes = "ALL";
+						IPTVSubsTable = "OTT_DTH_Data";
 
-					String voiceCustomersAffected = dbs.countDistinctRowsForSpecificColumnsNGAIncluded(voiceSubsTable,
-							new String[] { "PASPORT_COID" },
-							hf.hierarchyKeys(hf.replaceHierarchyForSubscribersAffected(myHier.get(i).toString(),
-									fullVoiceHierarchyPathSplit)),
-							hf.hierarchyValues(hf.replaceHierarchyForSubscribersAffected(myHier.get(i).toString(),
-									fullVoiceHierarchyPathSplit)),
-							hf.hierarchyStringTypes(hf.replaceHierarchyForSubscribersAffected(myHier.get(i).toString(),
-									fullVoiceHierarchyPathSplit)),
-							ngaTypes);
+						if (service.equals("IPTV")) {
+							backupEligible = "No";
 
-					// For Voice no data customers are affected and vice versa
-					if (service.equals("Voice"))
-					{
-						dataCustomersAffected = "0";
-						IPTVCustomersAffected = "0";
+							voiceCustomersAffected = "0";
+							dataCustomersAffected = "0";
 
-						// Get Unique Locations affected from Voice_Resource_Path
-						List<String> myList = dbs.getOneColumnUniqueResultSet("Prov_Voice_Resource_Path", "SiteName",
-								hf.hierarchyKeys(hf.replaceHierarchyForSubscribersAffected(myHier.get(i).toString(),
-										fullVoiceHierarchyPathSplit)),
-								hf.hierarchyValues(hf.replaceHierarchyForSubscribersAffected(myHier.get(i).toString(),
-										fullVoiceHierarchyPathSplit)),
-								hf.hierarchyStringTypes(hf.replaceHierarchyForSubscribersAffected(
-										myHier.get(i).toString(), fullVoiceHierarchyPathSplit)));
-						locationsAffectedList.addAll(myList);
+							// All EON Boxes
+							if (HierarchySelected.endsWith(Massive_TV_Outage.ALL_EON_Boxes.getDisplayName())) {
 
-					} else if (service.equals("Data"))
-					{
-						voiceCustomersAffected = "0";
-						IPTVCustomersAffected = "0";
+								IPTVCustomersAffected = dbs.countDistinctRowsForSpecificColumnsNGAIncluded(IPTVSubsTable,
+										new String[]{"TV_ID"},
+										new String[]{"TV_Service"},
+										new String[]{"OTT"},
+										new String[]{"String"},
+										ngaTypes);
 
-						// Get Unique Locations affected from Internet_Resource_Path
-						List<String> myList = dbs.getOneColumnUniqueResultSet("Prov_Internet_Resource_Path", "SiteName",
+								// All Satellite Boxes
+							} else if (HierarchySelected.endsWith(Massive_TV_Outage.ALL_Satellite_Boxes.getDisplayName())) {
 
+								IPTVCustomersAffected = dbs.countDistinctRowsForSpecificColumnsNGAIncluded(IPTVSubsTable,
+										new String[]{"TV_ID"},
+										new String[]{"TV_Service"},
+										new String[]{"DTH"},
+										new String[]{"String"},
+										ngaTypes);
+							}
+						}
+
+						// For Everything else except Massive TV Outage
+					} else {
+						// Count distinct values of Usernames or CliVlaues in the respective columns
+						dataCustomersAffected = dbs.countDistinctRowsForSpecificColumnsNGAIncluded(dataSubsTable,
+								new String[]{"PASPORT_COID"},
 								hf.hierarchyKeys(hf.replaceHierarchyForSubscribersAffected(myHier.get(i).toString(),
 										fullDataHierarchyPathSplit)),
 								hf.hierarchyValues(hf.replaceHierarchyForSubscribersAffected(myHier.get(i).toString(),
 										fullDataHierarchyPathSplit)),
-								hf.hierarchyStringTypes(hf.replaceHierarchyForSubscribersAffected(
-										myHier.get(i).toString(), fullDataHierarchyPathSplit)));
-						locationsAffectedList.addAll(myList);
+								hf.hierarchyStringTypes(hf.replaceHierarchyForSubscribersAffected(myHier.get(i).toString(),
+										fullDataHierarchyPathSplit)),
+								ngaTypes);
 
-					} else if (service.equals("IPTV"))
-					{
-						dataCustomersAffected = "0";
-						voiceCustomersAffected = "0";
-
-						// Get Unique Locations affected from Internet_Resource_Path
-						List<String> myList = dbs.getOneColumnUniqueResultSet("Prov_IPTV_Resource_Path", "SiteName",
+						// Count distinct values of Usernames or CliVlaues in the respective columns
+						IPTVCustomersAffected = dbs.countDistinctRowsForSpecificColumnsNGAIncluded(IPTVSubsTable,
+								new String[]{"PASPORT_COID"},
 								hf.hierarchyKeys(hf.replaceHierarchyForSubscribersAffected(myHier.get(i).toString(),
 										fullIPTVHierarchyPathSplit)),
 								hf.hierarchyValues(hf.replaceHierarchyForSubscribersAffected(myHier.get(i).toString(),
 										fullIPTVHierarchyPathSplit)),
-								hf.hierarchyStringTypes(hf.replaceHierarchyForSubscribersAffected(
-										myHier.get(i).toString(), fullIPTVHierarchyPathSplit)));
-						locationsAffectedList.addAll(myList);
+								hf.hierarchyStringTypes(hf.replaceHierarchyForSubscribersAffected(myHier.get(i).toString(),
+										fullIPTVHierarchyPathSplit)),
+								ngaTypes);
+
+						voiceCustomersAffected = dbs.countDistinctRowsForSpecificColumnsNGAIncluded(voiceSubsTable,
+								new String[]{"PASPORT_COID"},
+								hf.hierarchyKeys(hf.replaceHierarchyForSubscribersAffected(myHier.get(i).toString(),
+										fullVoiceHierarchyPathSplit)),
+								hf.hierarchyValues(hf.replaceHierarchyForSubscribersAffected(myHier.get(i).toString(),
+										fullVoiceHierarchyPathSplit)),
+								hf.hierarchyStringTypes(hf.replaceHierarchyForSubscribersAffected(myHier.get(i).toString(),
+										fullVoiceHierarchyPathSplit)),
+								ngaTypes);
+
+						// For Voice no data customers are affected and vice versa
+						if (service.equals("Voice")) {
+							dataCustomersAffected = "0";
+							IPTVCustomersAffected = "0";
+
+							// Get Unique Locations affected from Voice_Resource_Path
+							List<String> myList = dbs.getOneColumnUniqueResultSet("Prov_Voice_Resource_Path", "SiteName",
+									hf.hierarchyKeys(hf.replaceHierarchyForSubscribersAffected(myHier.get(i).toString(),
+											fullVoiceHierarchyPathSplit)),
+									hf.hierarchyValues(hf.replaceHierarchyForSubscribersAffected(myHier.get(i).toString(),
+											fullVoiceHierarchyPathSplit)),
+									hf.hierarchyStringTypes(hf.replaceHierarchyForSubscribersAffected(
+											myHier.get(i).toString(), fullVoiceHierarchyPathSplit)));
+							locationsAffectedList.addAll(myList);
+
+						} else if (service.equals("Data")) {
+							voiceCustomersAffected = "0";
+							IPTVCustomersAffected = "0";
+
+							// Get Unique Locations affected from Internet_Resource_Path
+							List<String> myList = dbs.getOneColumnUniqueResultSet("Prov_Internet_Resource_Path", "SiteName",
+									hf.hierarchyKeys(hf.replaceHierarchyForSubscribersAffected(myHier.get(i).toString(),
+											fullDataHierarchyPathSplit)),
+									hf.hierarchyValues(hf.replaceHierarchyForSubscribersAffected(myHier.get(i).toString(),
+											fullDataHierarchyPathSplit)),
+									hf.hierarchyStringTypes(hf.replaceHierarchyForSubscribersAffected(
+											myHier.get(i).toString(), fullDataHierarchyPathSplit)));
+							locationsAffectedList.addAll(myList);
+
+						} else if (service.equals("IPTV")) {
+							dataCustomersAffected = "0";
+							voiceCustomersAffected = "0";
+
+							// Get Unique Locations affected from Internet_Resource_Path
+							List<String> myList = dbs.getOneColumnUniqueResultSet("Prov_IPTV_Resource_Path", "SiteName",
+									hf.hierarchyKeys(hf.replaceHierarchyForSubscribersAffected(myHier.get(i).toString(),
+											fullIPTVHierarchyPathSplit)),
+									hf.hierarchyValues(hf.replaceHierarchyForSubscribersAffected(myHier.get(i).toString(),
+											fullIPTVHierarchyPathSplit)),
+									hf.hierarchyStringTypes(hf.replaceHierarchyForSubscribersAffected(
+											myHier.get(i).toString(), fullIPTVHierarchyPathSplit)));
+							locationsAffectedList.addAll(myList);
+						}
+
+						// Pick Unique values from locationsAffectedList
+						uniqueLocationsSet = new HashSet<String>(locationsAffectedList);
+
+						// Concatenating uniqueLocationsSet with pipe delimeter
+						if (uniqueLocationsSet.size() > 0) {
+							locationsAffected = String.join("|", uniqueLocationsSet);
+							//						System.out.println("locationsAffected = " + locationsAffected);
+						} else {
+							locationsAffected = "none";
+						}
 					}
-
-					// Pick Unique values from locationsAffectedList
-					uniqueLocationsSet = new HashSet<String>(locationsAffectedList);
-
-					// Concatenating uniqueLocationsSet with pipe delimeter
-					if (uniqueLocationsSet.size() > 0)
-					{
-						locationsAffected = String.join("|", uniqueLocationsSet);
-						//						System.out.println("locationsAffected = " + locationsAffected);
-					} else
-					{
-						locationsAffected = "none";
-					}
-
 					incidentDataCustomersAffected += Integer.parseInt(dataCustomersAffected);
 					incidentVoiceCustomersAffected += Integer.parseInt(voiceCustomersAffected);
 					incidentIPTVCustomersAffected += Integer.parseInt(IPTVCustomersAffected);
@@ -729,10 +743,9 @@ public class WebSpectra implements InterfaceWebSpectra
 
 					if (incidentAlreadyExists)
 					{
-						//throw new InvalidInputException("There is already an openned incident (" + IncidentID
+						return; //throw new InvalidInputException("There is already an openned incident (" + IncidentID
 						//	+ ") that defines outage for AffectedService = " + service + " and HierarchySelected = "
-						//+ myHier.get(i).toString(), "Error 195");
-						return;
+						//	+ myHier.get(i).toString(), "Error 195");
 					}
 				}
 			}
@@ -749,10 +762,12 @@ public class WebSpectra implements InterfaceWebSpectra
 				numberOfVoiceCustAffectedFromPreviousIncidents = s_dbs.maxNumberOfCustomersAffected(
 						"SubmittedIncidents", "IncidentAffectedVoiceCustomers", new String[] { "IncidentID" },
 						new String[] { IncidentID });
-				numberOfDataCustAffectedFromPreviousIncidents = s_dbs.maxNumberOfCustomersAffected("SubmittedIncidents",
-						"IncidentAffectedDataCustomers", new String[] { "IncidentID" }, new String[] { IncidentID });
-				numberOfIPTVCustAffectedFromPreviousIncidents = s_dbs.maxNumberOfCustomersAffected("SubmittedIncidents",
-						"IncidentAffectedIPTVCustomers", new String[] { "IncidentID" }, new String[] { IncidentID });
+				numberOfDataCustAffectedFromPreviousIncidents = s_dbs.maxNumberOfCustomersAffected(
+						"SubmittedIncidents", "IncidentAffectedDataCustomers", new String[] { "IncidentID" },
+						new String[] { IncidentID });
+				numberOfIPTVCustAffectedFromPreviousIncidents = s_dbs.maxNumberOfCustomersAffected(
+						"SubmittedIncidents", "IncidentAffectedIPTVCustomers", new String[] { "IncidentID" },
+						new String[] { IncidentID });
 
 			}
 
@@ -792,24 +807,23 @@ public class WebSpectra implements InterfaceWebSpectra
 
 				// Calculate CLIs Affected but replace column names in order to search table for
 				// customers affected
-				String CLIsAffected_String = dbs.countDistinctCLIsAffected(new String[] { "PASPORT_COID" },
-						hf.hierarchyKeys(hf.replaceHierarchyForSubscribersAffected(myHier.get(i).toString(),
-								fullVoiceHierarchyPathSplit)),
-						hf.hierarchyValues(hf.replaceHierarchyForSubscribersAffected(myHier.get(i).toString(),
-								fullVoiceHierarchyPathSplit)),
-						hf.hierarchyStringTypes(hf.replaceHierarchyForSubscribersAffected(myHier.get(i).toString(),
-								fullVoiceHierarchyPathSplit)),
-						ngaTypes, AffectedServices, voiceSubsTable, dataSubsTable, IPTVSubsTable);
-				CLIsAffectedPerIncident += Integer.parseInt(CLIsAffected_String);
+//				String CLIsAffected_String = dbs.countDistinctCLIsAffected(new String[] { "PASPORT_COID" },
+//						hf.hierarchyKeys(hf.replaceHierarchyForSubscribersAffected(myHier.get(i).toString(),
+//								fullVoiceHierarchyPathSplit)),
+//						hf.hierarchyValues(hf.replaceHierarchyForSubscribersAffected(myHier.get(i).toString(),
+//								fullVoiceHierarchyPathSplit)),
+//						hf.hierarchyStringTypes(hf.replaceHierarchyForSubscribersAffected(myHier.get(i).toString(),
+//								fullVoiceHierarchyPathSplit)),
+//						ngaTypes, AffectedServices, voiceSubsTable, dataSubsTable, IPTVSubsTable);
+//				CLIsAffectedPerIncident += Integer.parseInt(CLIsAffected_String);
 			}
 
-			String CLIsAffected = String.valueOf(CLIsAffectedPerIncident);
+//			String CLIsAffected = String.valueOf(CLIsAffectedPerIncident);
 
 			for (String service : servicesAffected)
 			{
 				for (int i = 0; i < myHier.size(); i++)
 				{
-
 					// Check Hierarchy Format Key_Value Pairs
 					hf.checkHierarchyFormatKeyValuePairs(myHier.get(i).toString());
 
@@ -819,17 +833,14 @@ public class WebSpectra implements InterfaceWebSpectra
 
 					// Determine Tables for Data/Voice subscribers
 					String dataSubsTable = dbs.getOneValue("HierarchyTablePerTechnology2", "DataSubscribersTableName",
-
 							new String[] { "RootHierarchyNode" }, new String[] { rootHierarchySelected },
 							new String[] { "String" });
 
 					String IPTVSubsTable = dbs.getOneValue("HierarchyTablePerTechnology2", "IPTVSubscribersTableName",
-
 							new String[] { "RootHierarchyNode" }, new String[] { rootHierarchySelected },
 							new String[] { "String" });
 
 					String voiceSubsTable = dbs.getOneValue("HierarchyTablePerTechnology2", "VoiceSubscribersTableName",
-
 							new String[] { "RootHierarchyNode" }, new String[] { rootHierarchySelected },
 							new String[] { "String" });
 
@@ -857,37 +868,79 @@ public class WebSpectra implements InterfaceWebSpectra
 							new String[] { "RootHierarchyNode" }, new String[] { rootHierarchySelected },
 							new String[] { "String" });
 
-					// Count distinct values of Usernames or CliVlaues the respective columns
-					String dataCustomersAffected = dbs.countDistinctRowsForSpecificColumnsNGAIncluded(dataSubsTable,
-							new String[] { "PASPORT_COID" },
-							hf.hierarchyKeys(hf.replaceHierarchyForSubscribersAffected(myHier.get(i).toString(),
-									fullDataHierarchyPathSplit)),
-							hf.hierarchyValues(hf.replaceHierarchyForSubscribersAffected(myHier.get(i).toString(),
-									fullDataHierarchyPathSplit)),
-							hf.hierarchyStringTypes(hf.replaceHierarchyForSubscribersAffected(myHier.get(i).toString(),
-									fullDataHierarchyPathSplit)),
-							ngaTypes);
+					String dataCustomersAffected = "0";
+					String IPTVCustomersAffected = "0";
+					String voiceCustomersAffected = "0";
 
-					String IPTVCustomersAffected = dbs.countDistinctRowsForSpecificColumnsNGAIncluded(IPTVSubsTable,
-							new String[] { "PASPORT_COID" },
-							hf.hierarchyKeys(hf.replaceHierarchyForSubscribersAffected(myHier.get(i).toString(),
-									fullIPTVHierarchyPathSplit)),
-							hf.hierarchyValues(hf.replaceHierarchyForSubscribersAffected(myHier.get(i).toString(),
-									fullIPTVHierarchyPathSplit)),
-							hf.hierarchyStringTypes(hf.replaceHierarchyForSubscribersAffected(myHier.get(i).toString(),
-									fullIPTVHierarchyPathSplit)),
-							ngaTypes);
+					// For Massive TV Outage Only...
+					if (rootHierarchySelected.startsWith(Massive_TV_Outage.Massive_TV_Outage.getDisplayName())) {
+						// KARFWTAAA
+						ngaTypes = "ALL";
+						IPTVSubsTable = "OTT_DTH_Data";
 
-					String voiceCustomersAffected = dbs.countDistinctRowsForSpecificColumnsNGAIncluded(voiceSubsTable,
-							new String[] { "PASPORT_COID" },
-							hf.hierarchyKeys(hf.replaceHierarchyForSubscribersAffected(myHier.get(i).toString(),
-									fullVoiceHierarchyPathSplit)),
-							hf.hierarchyValues(hf.replaceHierarchyForSubscribersAffected(myHier.get(i).toString(),
-									fullVoiceHierarchyPathSplit)),
-							hf.hierarchyStringTypes(hf.replaceHierarchyForSubscribersAffected(myHier.get(i).toString(),
-									fullVoiceHierarchyPathSplit)),
-							ngaTypes);
+						if (service.equals("IPTV")) {
+							backupEligible = "No";
 
+							voiceCustomersAffected = "0";
+							dataCustomersAffected = "0";
+
+							// All EON Boxes
+							if (HierarchySelected.endsWith(Massive_TV_Outage.ALL_EON_Boxes.getDisplayName())) {
+
+								IPTVCustomersAffected = dbs.countDistinctRowsForSpecificColumnsNGAIncluded(IPTVSubsTable,
+										new String[]{"TV_ID"},
+										new String[]{"TV_Service"},
+										new String[]{"OTT"},
+										new String[]{"String"},
+										ngaTypes);
+
+								// All Satellite Boxes
+							} else if (HierarchySelected.endsWith(Massive_TV_Outage.ALL_Satellite_Boxes.getDisplayName())) {
+
+								IPTVCustomersAffected = dbs.countDistinctRowsForSpecificColumnsNGAIncluded(IPTVSubsTable,
+										new String[]{"TV_ID"},
+										new String[]{"TV_Service"},
+										new String[]{"DTH"},
+										new String[]{"String"},
+										ngaTypes);
+							}
+
+						}
+
+						// For Everything else except Massive TV Outage
+					} else {
+
+						// Count distinct values of Usernames or CliVlaues the respective columns
+						dataCustomersAffected = dbs.countDistinctRowsForSpecificColumnsNGAIncluded(dataSubsTable,
+								new String[]{"PASPORT_COID"},
+								hf.hierarchyKeys(hf.replaceHierarchyForSubscribersAffected(myHier.get(i).toString(),
+										fullDataHierarchyPathSplit)),
+								hf.hierarchyValues(hf.replaceHierarchyForSubscribersAffected(myHier.get(i).toString(),
+										fullDataHierarchyPathSplit)),
+								hf.hierarchyStringTypes(hf.replaceHierarchyForSubscribersAffected(myHier.get(i).toString(),
+										fullDataHierarchyPathSplit)),
+								ngaTypes);
+
+						IPTVCustomersAffected = dbs.countDistinctRowsForSpecificColumnsNGAIncluded(IPTVSubsTable,
+								new String[]{"PASPORT_COID"},
+								hf.hierarchyKeys(hf.replaceHierarchyForSubscribersAffected(myHier.get(i).toString(),
+										fullIPTVHierarchyPathSplit)),
+								hf.hierarchyValues(hf.replaceHierarchyForSubscribersAffected(myHier.get(i).toString(),
+										fullIPTVHierarchyPathSplit)),
+								hf.hierarchyStringTypes(hf.replaceHierarchyForSubscribersAffected(myHier.get(i).toString(),
+										fullIPTVHierarchyPathSplit)),
+								ngaTypes);
+
+						voiceCustomersAffected = dbs.countDistinctRowsForSpecificColumnsNGAIncluded(voiceSubsTable,
+								new String[]{"PASPORT_COID"},
+								hf.hierarchyKeys(hf.replaceHierarchyForSubscribersAffected(myHier.get(i).toString(),
+										fullVoiceHierarchyPathSplit)),
+								hf.hierarchyValues(hf.replaceHierarchyForSubscribersAffected(myHier.get(i).toString(),
+										fullVoiceHierarchyPathSplit)),
+								hf.hierarchyStringTypes(hf.replaceHierarchyForSubscribersAffected(myHier.get(i).toString(),
+										fullVoiceHierarchyPathSplit)),
+								ngaTypes);
+					}
 					// For Voice no data customers are affected and vice versa
 					if (service.equals("Voice"))
 					{
@@ -923,8 +976,17 @@ public class WebSpectra implements InterfaceWebSpectra
 					int totalIPTVIncidentAffected = incidentIPTVCustomersAffected
 							+ Integer.parseInt(numberOfIPTVCustAffectedFromPreviousIncidents);
 
-					// Concatenate locations with pipe
-					locationsAffected = String.join("|", uniqueLocationsSet);
+					// Case the Hiearchy starts with 'Massive_TV_Outage'
+					if (rootHierarchySelected.startsWith(Massive_TV_Outage.Massive_TV_Outage.getDisplayName())) {
+						if (HierarchySelected.endsWith(Massive_TV_Outage.ALL_EON_Boxes.getDisplayName())) {
+							locationsAffected = "All EON Locations";
+						} else if (HierarchySelected.endsWith(Massive_TV_Outage.ALL_Satellite_Boxes.getDisplayName())) {
+							locationsAffected = "All Satellite Dish Locations";
+						}
+					} else {
+						// Concatenate locations with pipe
+						locationsAffected = String.join("|", uniqueLocationsSet);
+					}
 
 					// Insert Values in Database
 					try
@@ -940,7 +1002,7 @@ public class WebSpectra implements InterfaceWebSpectra
 								new String[] { RequestID, hf.now(), "Yes", backupEligible, OutageID_String, "OPEN",
 										RequestTimestamp, SystemID, UserID, IncidentID, Scheduled, StartTime, EndTime,
 										Duration, service, Impact, Priority, myHier.get(i).toString(),
-										locationsAffected, voiceCustomersAffected, dataCustomersAffected, CLIsAffected,
+										locationsAffected, voiceCustomersAffected, dataCustomersAffected, "0",
 										"0", IPTVCustomersAffected, Integer.toString(totalVoiceIncidentAffected),
 										Integer.toString(totalDataIncidentAffected),
 										Integer.toString(totalIPTVIncidentAffected) },
@@ -950,17 +1012,25 @@ public class WebSpectra implements InterfaceWebSpectra
 										"Integer", "Integer", "Integer", "Integer", "Integer", "Integer", "Integer" });
 					} catch (SQLException e)
 					{
-						//throw new InvalidInputException("An Error occured during submission of data!", "Error 1500");
-						return;
+						return; //throw new InvalidInputException("An Error occured during submission of data!", "Error 1500");
 					}
 
 					if (Integer.parseInt(OutageID_String) > 0)
 					{
-						// Concatenate locations with comma
-						locationsAffected = String.join(", ", uniqueLocationsSet);
+						// Case the Hiearchy starts with 'Massive_TV_Outage'
+						if (rootHierarchySelected.startsWith(Massive_TV_Outage.Massive_TV_Outage.getDisplayName())) {
+							if (HierarchySelected.endsWith(Massive_TV_Outage.ALL_EON_Boxes.getDisplayName())) {
+								locationsAffected = "All EON Locations";
+							} else if (HierarchySelected.endsWith(Massive_TV_Outage.ALL_Satellite_Boxes.getDisplayName())) {
+								locationsAffected = "All Satellite Dish Locations";
+							}
+						} else {
+							// Concatenate locations with comma
+							locationsAffected = String.join(", ", uniqueLocationsSet);
+						}
 
 						ProductOfSubmission ps = new ProductOfSubmission(RequestID, OutageID_String, IncidentID,
-								voiceCustomersAffected, dataCustomersAffected, IPTVCustomersAffected, CLIsAffected,
+								voiceCustomersAffected, dataCustomersAffected, IPTVCustomersAffected, "0",
 								locationsAffected, Integer.toString(totalVoiceIncidentAffected),
 								Integer.toString(totalDataIncidentAffected),
 								Integer.toString(totalIPTVIncidentAffected), "1", service, myHier.get(i).toString(),
@@ -968,9 +1038,9 @@ public class WebSpectra implements InterfaceWebSpectra
 						prodElementsList.add(ps);
 
 						// Production of the CSV Exported File for the Closed Incident.
-						OpenningIncidentOutageToCSV OIATCSV = new OpenningIncidentOutageToCSV(dbs, s_dbs, IncidentID,
-								OutageID_String);
-						OIATCSV.produceReport();
+//						OpenningIncidentOutageToCSV OIATCSV = new OpenningIncidentOutageToCSV(dbs, s_dbs, IncidentID,
+//								OutageID_String);
+//						OIATCSV.produceReport();
 
 						logger.info(req.getRemoteAddr() + " - ReqID: " + RequestID + " - Submitted Outage: INCID: "
 								+ IncidentID + " | OutageID: " + OutageID_String);
@@ -981,7 +1051,7 @@ public class WebSpectra implements InterfaceWebSpectra
 			//return prodElementsList;
 		} catch (Exception e)
 		{
-			//throw e;
+			e.printStackTrace();
 		} finally
 		{
 			// Send Similar request to Spectra_Reporting server
@@ -1055,8 +1125,7 @@ public class WebSpectra implements InterfaceWebSpectra
 			} catch (Exception ex)
 			{
 				logger.fatal("Could not open connection with database!");
-				//throw new Exception(ex.getMessage());
-				return;
+				return; //throw new Exception(ex.getMessage());
 			}
 		}
 
@@ -1070,8 +1139,7 @@ public class WebSpectra implements InterfaceWebSpectra
 			} catch (Exception ex)
 			{
 				logger.fatal("Could not open connection with database!");
-				//throw new Exception(ex.getMessage());
-				return;
+				return; //throw new Exception(ex.getMessage());
 			}
 		}
 
@@ -1080,6 +1148,7 @@ public class WebSpectra implements InterfaceWebSpectra
 		try
 		{
 			Help_Func hf = new Help_Func();
+
 			// Those 2 directives is for IP retrieval of web request
 			mc = wsContext.getMessageContext();
 			req = (HttpServletRequest) mc.get(MessageContext.SERVLET_REQUEST);
@@ -1102,8 +1171,7 @@ public class WebSpectra implements InterfaceWebSpectra
 				logger.error(req.getRemoteAddr() + " - ReqID: " + RequestID
 						+ "Get Outage Status: - Wrong credentials provided - UserName: " + UserName + " Password: "
 						+ Password);
-				//throw new InvalidInputException("User name or Password incorrect!", "Error 100");
-				return;
+				return; //throw new InvalidInputException("User name or Password incorrect!", "Error 100");
 			}
 
 			// Update Statistics
@@ -1146,8 +1214,7 @@ public class WebSpectra implements InterfaceWebSpectra
 			}
 			if (Integer.parseInt(numOfRows) == 0)
 			{
-				//throw new InvalidInputException("No Results found", "No Results found according to your criteria");
-				return;
+				return; //throw new InvalidInputException("No Results found", "No Results found according to your criteria");
 			} else
 			{
 				while (rs.next())
@@ -1168,11 +1235,9 @@ public class WebSpectra implements InterfaceWebSpectra
 				}
 			}
 			//return prodElementsList;
-
 		} catch (Exception e)
 		{
-			//throw e;
-			return;
+			return; //throw e;
 		} finally
 		{
 			try
@@ -1187,7 +1252,6 @@ public class WebSpectra implements InterfaceWebSpectra
 				{
 					s_conObj.closeDBConnection();
 				}
-
 				conn = null;
 				conObj = null;
 				s_conn = null;
@@ -1241,8 +1305,7 @@ public class WebSpectra implements InterfaceWebSpectra
 			} catch (Exception ex)
 			{
 				logger.fatal("Could not open connection with database!");
-				//throw new Exception(ex.getMessage());
-				return;
+				return; //throw new Exception(ex.getMessage());
 			}
 		}
 
@@ -1256,8 +1319,7 @@ public class WebSpectra implements InterfaceWebSpectra
 			} catch (Exception ex)
 			{
 				logger.fatal("Could not open connection with database!");
-				//throw new Exception(ex.getMessage());
-				return;
+				return; //throw new Exception(ex.getMessage());
 			}
 		}
 
@@ -1266,6 +1328,7 @@ public class WebSpectra implements InterfaceWebSpectra
 		try
 		{
 			Help_Func hf = new Help_Func();
+
 			// Those 2 directives is for IP retrieval of web request
 			mc = wsContext.getMessageContext();
 			req = (HttpServletRequest) mc.get(MessageContext.SERVLET_REQUEST);
@@ -1281,8 +1344,7 @@ public class WebSpectra implements InterfaceWebSpectra
 				logger.error(req.getRemoteAddr() + " - ReqID: " + RequestID
 						+ "Modify Outage: - Wrong credentials provided - UserName: " + UserName + " Password: "
 						+ Password);
-				//throw new InvalidInputException("User name or Password incorrect!", "Error 100");
-				return;
+				return; //throw new InvalidInputException("User name or Password incorrect!", "Error 100");
 			}
 
 			// Update Statistics
@@ -1396,11 +1458,10 @@ public class WebSpectra implements InterfaceWebSpectra
 				if (!incidentIsScheduled
 						&& (!hf.checkIfEmpty("StartTime", StartTime) || (!hf.checkIfEmpty("EndTime", EndTime))))
 				{
-					//throw new InvalidInputException(
-					//	"The fields of 'Star Time'/'End Time' cannot be modified on non scheduled Outages (Incident: "
-					//		+ IncidentID + ", OutageID " + OutageID + " is not a scheduled incident)",
-					//	"Error 385");
-					return;
+					return; //throw new InvalidInputException(
+					//		"The fields of 'Star Time'/'End Time' cannot be modified on non scheduled Outages (Incident: "
+					//			+ IncidentID + ", OutageID " + OutageID + " is not a scheduled incident)",
+					//"Error 385");
 				}
 
 				// Check if Incident is still open
@@ -1410,11 +1471,10 @@ public class WebSpectra implements InterfaceWebSpectra
 
 				if (isIncidentClosed)
 				{
-					//throw new InvalidInputException(
+					return; //throw new InvalidInputException(
 					//	"The combination of IncidentID/OutageID is already closed and it cannot be modified - IncidentID: "
 					//		+ IncidentID + " / OutageID: " + OutageID,
-					//	"Error 715");
-					return;
+					//"Error 715");
 				}
 
 				// Update Operation
@@ -1427,8 +1487,7 @@ public class WebSpectra implements InterfaceWebSpectra
 							new String[] { "String", "Integer" });
 				} catch (Exception e)
 				{
-					//throw new InvalidInputException("An Error occured during modification of data!", "Error 1500");
-					return;
+					return; //throw new InvalidInputException("An Error occured during modification of data!", "Error 1500");
 				}
 
 				if (numOfRowsUpdated == 1)
@@ -1443,16 +1502,17 @@ public class WebSpectra implements InterfaceWebSpectra
 				}
 			} else
 			{
-				//throw new InvalidInputException("The combination of IncidentID: " + IncidentID + " and OutageID: "
+				return; //throw new InvalidInputException("The combination of IncidentID: " + IncidentID + " and OutageID: "
 				//	+ OutageID + " does not exist!", "Error 550");
-				return;
 			}
+
 			// Return instance of class ProductOfModify
-			//return pom;
+			// return pom;
 		} catch (Exception e)
+
 		{
-			//throw e;
-			return;
+			e.printStackTrace();
+			return; //throw e;
 		} finally
 		{
 			// Send Similar request to Spectra_Reporting server
@@ -1498,7 +1558,7 @@ public class WebSpectra implements InterfaceWebSpectra
 
 	@Override
 	@WebMethod
-	@Oneway
+	@WebResult(name = "Result")
 	public void closeOutage(@WebParam(name = "UserName", header = true, mode = Mode.IN) String UserName,
 			@WebParam(name = "Password", header = true, mode = Mode.IN) String Password,
 			@WebParam(name = "RequestID") @XmlElement(required = true) String RequestID,
@@ -1508,6 +1568,8 @@ public class WebSpectra implements InterfaceWebSpectra
 			@WebParam(name = "IncidentID") @XmlElement(required = true) String IncidentID,
 			@WebParam(name = "OutageID") @XmlElement(required = true) String OutageID)
 	{
+		Help_Func hf = new Help_Func();
+
 		Logger logger = LogManager.getLogger(gr.wind.spectra.web.WebSpectra.class.getName());
 		Connection conn = null;
 		DB_Connection conObj = null;
@@ -1530,8 +1592,7 @@ public class WebSpectra implements InterfaceWebSpectra
 			} catch (Exception ex)
 			{
 				logger.fatal("Could not open connection with database!");
-				//throw new Exception(ex.getMessage());
-				return;
+				return; //throw new Exception(ex.getMessage());
 			}
 		}
 
@@ -1545,8 +1606,7 @@ public class WebSpectra implements InterfaceWebSpectra
 			} catch (Exception ex)
 			{
 				logger.fatal("Could not open connection with database!");
-				//throw new Exception(ex.getMessage());
-				return;
+				return; //throw new Exception(ex.getMessage());
 			}
 		}
 
@@ -1554,7 +1614,6 @@ public class WebSpectra implements InterfaceWebSpectra
 		int numOfRowsUpdated = 0;
 		try
 		{
-			Help_Func hf = new Help_Func();
 			// Those 2 directives is for IP retrieval of web request
 			mc = wsContext.getMessageContext();
 			req = (HttpServletRequest) mc.get(MessageContext.SERVLET_REQUEST);
@@ -1570,8 +1629,7 @@ public class WebSpectra implements InterfaceWebSpectra
 				logger.error(req.getRemoteAddr() + " - ReqID: " + RequestID
 						+ " - Close Outage: - Wrong credentials provided - UserName: " + UserName + " Password: "
 						+ Password);
-				//throw new InvalidInputException("User name or Password incorrect!", "Error 100");
-				return;
+				return; //throw new InvalidInputException("User name or Password incorrect!", "Error 100");
 			}
 
 			// Update Statistics
@@ -1625,9 +1683,8 @@ public class WebSpectra implements InterfaceWebSpectra
 									new String[] { IncidentID, OutageID }, new String[] { "String", "Integer" });
 						} catch (Exception e)
 						{
-							//throw new InvalidInputException("An Error occured during closure/submission of data!",
+							return; //throw new InvalidInputException("An Error occured during closure/submission of data!",
 							//	"Error 1500");
-							return;
 						}
 
 					} else
@@ -1646,9 +1703,8 @@ public class WebSpectra implements InterfaceWebSpectra
 									new String[] { "String", "Integer" });
 						} catch (Exception e)
 						{
-							//throw new InvalidInputException("An Error occured during closure/submission of data!",
+							return; //throw new InvalidInputException("An Error occured during closure/submission of data!",
 							//	"Error 1500");
-							return;
 						}
 					}
 
@@ -1659,8 +1715,8 @@ public class WebSpectra implements InterfaceWebSpectra
 								+ IncidentID + "| OutageID: " + OutageID + " successfully CLOSED");
 
 						// Production of the CSV Exported File for the Closed Incident.
-						IncidentOutageToCSV IOCSV = new IncidentOutageToCSV(dbs, s_dbs, IncidentID, OutageID);
-						IOCSV.produceReport();
+//						IncidentOutageToCSV IOCSV = new IncidentOutageToCSV(dbs, s_dbs, IncidentID, OutageID);
+//						IOCSV.produceReport();
 
 						new ProductOfCloseOutage(RequestID, IncidentID, OutageID, "990",
 								"Successfully Closed Incident");
@@ -1678,27 +1734,18 @@ public class WebSpectra implements InterfaceWebSpectra
 							new String[] { "String", "String" });
 					logger.error(req.getRemoteAddr() + " - ReqID: " + RequestID + " - Close Outage: INCID: "
 							+ IncidentID + " | OutageID: " + OutageID + " is already closed since: " + closedTime);
-					//throw new InvalidInputException("The combination of IncidentID: " + IncidentID + " and OutageID: "
+					return; //throw new InvalidInputException("The combination of IncidentID: " + IncidentID + " and OutageID: "
 					//	+ OutageID + " has already been closed since: " + closedTime, "Error 820");
-					return;
 				}
 			} else
 			{
 				logger.error(req.getRemoteAddr() + " - ReqID: " + RequestID
 						+ " - Close Outage: The combination of IncidentID: " + IncidentID + " | OutageID: " + OutageID
 						+ " does not exist");
-				//throw new InvalidInputException("The combination of IncidentID: " + IncidentID + " and OutageID: "
-				//	+ OutageID + " does not exist!", "Error 950");
-				return;
+				return; //throw new InvalidInputException("The combination of IncidentID: " + IncidentID + " and OutageID: "
+						//+ OutageID + " does not exist!", "Error 950");
 			}
 
-			//return poca;
-		} catch (Exception e)
-		{
-			//throw e;
-			return;
-		} finally
-		{
 			// Send Similar request to Spectra_Reporting server
 			/*try
 			{
@@ -1711,6 +1758,13 @@ public class WebSpectra implements InterfaceWebSpectra
 				e.printStackTrace();
 			}*/
 
+			//return poca;
+		} catch (Exception e)
+		{
+			e.printStackTrace();
+			return; //throw e;
+		} finally
+		{
 			try
 			{
 				logger.trace(req.getRemoteAddr() + " - ReqID: " + RequestID + " - Close Outage: Closing DB Connection");
@@ -1741,7 +1795,7 @@ public class WebSpectra implements InterfaceWebSpectra
 
 	@Override
 	@WebMethod
-	@Oneway
+	@WebResult(name = "Result")
 	public void NLU_Active(@WebParam(name = "UserName", header = true, mode = Mode.IN) String UserName,
 			@WebParam(name = "Password", header = true, mode = Mode.IN) String Password,
 			@WebParam(name = "RequestID") @XmlElement(required = true) String RequestID,
@@ -1774,8 +1828,7 @@ public class WebSpectra implements InterfaceWebSpectra
 			} catch (Exception ex)
 			{
 				logger.fatal("Could not open connection with database!");
-				//throw new Exception(ex.getMessage());
-				return;
+				return; //throw new Exception(ex.getMessage());
 			}
 		}
 
@@ -1789,15 +1842,14 @@ public class WebSpectra implements InterfaceWebSpectra
 			} catch (Exception ex)
 			{
 				logger.fatal("Could not open connection with database!");
-				//throw new Exception(ex.getMessage());
-				return;
+				return; //throw new Exception(ex.getMessage());
 			}
 		}
 
-		new WebSpectra();
 		try
 		{
 			Help_Func hf = new Help_Func();
+
 			// Those 2 directives is for IP retrieval of web request
 			mc = wsContext.getMessageContext();
 			req = (HttpServletRequest) mc.get(MessageContext.SERVLET_REQUEST);
@@ -1814,8 +1866,7 @@ public class WebSpectra implements InterfaceWebSpectra
 				logger.error(req.getRemoteAddr() + " - ReqID: " + RequestID
 						+ "NLU Active: - Wrong credentials provided - UserName: " + UserName + " Password: "
 						+ Password);
-				//throw new InvalidInputException("User name or Password incorrect!", "Error 100");
-				return;
+				return; //throw new InvalidInputException("User name or Password incorrect!", "Error 100");
 			}
 
 			// Check if Required fields are empty
@@ -1824,7 +1875,7 @@ public class WebSpectra implements InterfaceWebSpectra
 			hf.validateNotEmpty("RequestTimestamp", RequestTimestamp);
 			hf.validateDateTimeFormat("RequestTimestamp", RequestTimestamp);
 			hf.validateNotEmpty("CLI", CLI);
-			// Help_Func.validateNotEmpty("Service", Service);
+			// Help_Func.validateNotEmpty("Service", Service)
 
 			// if Impact Value Exists
 			if (!hf.checkIfEmpty("Service", Service))
@@ -1838,7 +1889,8 @@ public class WebSpectra implements InterfaceWebSpectra
 
 		} catch (Exception e)
 		{
-			//throw e;
+			e.printStackTrace();
+			return; //throw e;
 		} finally
 		{
 			// Send Similar request to Spectra_Reporting server
@@ -1851,8 +1903,8 @@ public class WebSpectra implements InterfaceWebSpectra
 			{
 				// TODO Auto-generated catch block
 				e.printStackTrace();
-			}
-			*/
+			}*/
+
 			try
 			{
 				logger.trace(req.getRemoteAddr() + " - ReqID: " + RequestID + " - NLU Active: Closing DB Connection");
@@ -1881,4 +1933,5 @@ public class WebSpectra implements InterfaceWebSpectra
 		}
 		//return ponla;
 	}
+
 }
