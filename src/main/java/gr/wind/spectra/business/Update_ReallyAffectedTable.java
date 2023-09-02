@@ -5,20 +5,21 @@ import java.sql.SQLException;
 public class Update_ReallyAffectedTable extends Thread
 {
 	s_DB_Operations s_dbs;
+	String systemID;
 	String foundIncidentID;
 	String allAffectedServices;
 	String foundScheduled;
 	String CLIProvided;
 
-	public Update_ReallyAffectedTable(s_DB_Operations s_dbs, String foundIncidentID, String allAffectedServices,
-			String foundScheduled, String CLIProvided)
+	public Update_ReallyAffectedTable(s_DB_Operations s_dbs, String systemID, String foundIncidentID, String allAffectedServices,
+									  String foundScheduled, String CLIProvided)
 	{
 		this.s_dbs = s_dbs;
+		this.systemID = systemID;
 		this.foundIncidentID = foundIncidentID;
 		this.allAffectedServices = allAffectedServices;
 		this.foundScheduled = foundScheduled;
 		this.CLIProvided = CLIProvided;
-
 	}
 
 	@Override
@@ -26,20 +27,20 @@ public class Update_ReallyAffectedTable extends Thread
 	{
 		String numOfTimesCliCalledForIncident = "0";
 
-		// Check if CLI for this Incident exists
+		// Check if CLI for this Incident & Requestor exists
 		// Check if we have at least one OPEN incident
 		try
 		{
 			numOfTimesCliCalledForIncident = s_dbs.numberOfRowsFound("Stats_Pos_NLU_Requests",
-					new String[] { "IncidentID", "CliValue" }, new String[] { foundIncidentID, CLIProvided },
-					new String[] { "String", "String" });
+					new String[] { "Requestor", "IncidentID", "CliValue" }, new String[] { systemID, foundIncidentID, CLIProvided },
+					new String[] { "String", "String", "String" });
 
 			// If CLI has not called again then insert line
 			if (numOfTimesCliCalledForIncident.equals("0"))
 			{
 				s_dbs.insertValuesInTable("Stats_Pos_NLU_Requests",
-						new String[] { "IncidentID", "AffectedService", "Scheduled", "CliValue" },
-						new String[] { foundIncidentID, allAffectedServices, foundScheduled, CLIProvided },
+						new String[] { "Requestor", "IncidentID", "AffectedService", "Scheduled", "CliValue" },
+						new String[] { systemID, foundIncidentID, allAffectedServices, foundScheduled, CLIProvided },
 						new String[] { "String", "String", "String", "String", "String" });
 			}
 			// CLI has called again for this specific incident
@@ -47,9 +48,8 @@ public class Update_ReallyAffectedTable extends Thread
 			{
 				// Update value using LAST_INSERT_ID method of MySQL e.g. SET ModifyOutage = LAST_INSERT_ID(ModifyOutage+1)
 				s_dbs.updateValuesBasedOnLastInsertID("Stats_Pos_NLU_Requests", "TimesCalled",
-						new String[] { "IncidentID", "CliValue" }, new String[] { foundIncidentID, CLIProvided },
-						new String[] { "String", "String" });
-
+						new String[] { "Requestor", "IncidentID", "CliValue" }, new String[] { systemID, foundIncidentID, CLIProvided },
+						new String[] { "String", "String", "String" });
 			}
 
 		} catch (SQLException e1)

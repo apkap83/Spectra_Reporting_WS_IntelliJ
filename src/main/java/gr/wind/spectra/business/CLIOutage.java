@@ -180,7 +180,7 @@ public class CLIOutage
 				ucdt.run();
 
 				// Update asynchronously Stats_Pos_NLU_Requests to count number of successful NLU requests per CLI
-				Update_ReallyAffectedTable uRat = new Update_ReallyAffectedTable(s_dbs, "AdHoc_Outage",
+				Update_ReallyAffectedTable uRat = new Update_ReallyAffectedTable(s_dbs, systemID,"AdHoc_Outage",
 						"Voice|Data|IPTV", "Yes", CLIProvided);
 				uRat.run();
 
@@ -285,6 +285,12 @@ public class CLIOutage
 					String Impact = rs.getString("Impact");
 					String OutageMsg = rs.getString("OutageMsg");
 					String BackupEligible = rs.getString("BackupEligible");
+
+					// Ignore Massive Outage Hierarchies
+					if (HierarchySelected.equals("Massive_TV_Outage->TV_Service=ALL_Satellite_Boxes") ||
+							HierarchySelected.equals("Massive_TV_Outage->TV_Service=ALL_EON_Boxes")) {
+						continue;
+					}
 
 					// If it is OPEN & Scheduled & Date(Now) > StartTime then set
 					// isOutageWithinScheduledRange to TRUE
@@ -644,7 +650,7 @@ public class CLIOutage
 				}
 
 				// Update asynchronously Stats_Pos_NLU_Requests to count number of successful NLU requests per CLI
-				Update_ReallyAffectedTable uRat = new Update_ReallyAffectedTable(s_dbs, foundIncidentID,
+				Update_ReallyAffectedTable uRat = new Update_ReallyAffectedTable(s_dbs, systemID, foundIncidentID,
 						allAffectedServices, foundScheduled, CLIProvided);
 				uRat.run();
 

@@ -21,18 +21,10 @@ import javax.xml.bind.annotation.XmlElement;
 import javax.xml.ws.WebServiceContext;
 import javax.xml.ws.handler.MessageContext;
 
+import gr.wind.spectra.business.*;
 import gr.wind.spectra.model.*;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-
-import gr.wind.spectra.business.DB_Connection;
-import gr.wind.spectra.business.DB_Operations;
-import gr.wind.spectra.business.Help_Func;
-import gr.wind.spectra.business.IncidentOutageToCSV;
-import gr.wind.spectra.business.OpenningIncidentOutageToCSV;
-import gr.wind.spectra.business.CLIOutage;
-import gr.wind.spectra.business.s_DB_Connection;
-import gr.wind.spectra.business.s_DB_Operations;
 
 @WebService(endpointInterface = "gr.wind.spectra.web.InterfaceWebSpectra")
 public class WebSpectra implements InterfaceWebSpectra
@@ -1884,8 +1876,16 @@ public class WebSpectra implements InterfaceWebSpectra
 				hf.validateDelimitedValues("Service", Service, "\\|", new String[] { "Voice", "Data", "IPTV" });
 			}
 
-			CLIOutage co = new CLIOutage(dbs, s_dbs, RequestID, SystemID);
-			co.checkCLIOutage(RequestID, CLI, Service);
+			// Check if the value provided in CliValue field is a CLI or a TV_ID
+			// It is a TV_ID
+			if (CLI.contains("-") || !CLI.startsWith("2")) {
+				// It is a TV_ID...
+				Outage_For_Massive_TV tofmt = new Outage_For_Massive_TV(dbs, s_dbs, RequestID, SystemID);
+				tofmt.checkMassiveTVOutage(CLI);
+			} else {
+				CLIOutage co = new CLIOutage(dbs, s_dbs, RequestID, SystemID);
+				co.checkCLIOutage(RequestID, CLI, Service);
+			}
 
 		} catch (Exception e)
 		{
