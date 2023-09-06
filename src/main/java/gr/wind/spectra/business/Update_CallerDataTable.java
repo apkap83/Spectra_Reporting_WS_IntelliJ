@@ -61,8 +61,14 @@ public class Update_CallerDataTable extends Thread
 								"PASPORT_COID", "LOOP_NUMBER", "CLI_TYPE", "Domain", "ServiceType", "BRASNAME" },
 						new String[] { "CliValue" }, new String[] { CLIProvided }, new String[] { "String" });
 
+				int timesFound = 0;
 				while (rs.next())
 				{
+					timesFound += 1;
+					if (timesFound > 1)
+					{
+						break; // Only 1 entry will be logged (even if subscriber belongs to 2 BRAS)
+					}
 
 					String NGA_TYPE = rs.getString("NGA_TYPE");
 					String GeneralArea = rs.getString("GeneralArea");
