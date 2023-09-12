@@ -34,7 +34,7 @@ public class Outage_For_Massive_TV {
 
 	}
 
-	public void checkMassiveTVOutage(String TV_ID)
+	public Boolean checkMassiveTVOutage(String TV_ID)
 			throws SQLException, InvalidInputException, ParseException
 	{
 		// Check if TV_ID Exists in our Database
@@ -49,7 +49,7 @@ public class Outage_For_Massive_TV {
 			ucdt.run();
 
 			// If it doesn't exist then Exit
-			return;
+			return false;
 		}
 
 		// Get the Value of TV_Service for that TV_ID - Possible Values: OTT or DTH
@@ -63,7 +63,7 @@ public class Outage_For_Massive_TV {
 			logger.info("SysID: " + systemID + " ReqID: " + requestID + " - TV_ID: "
 					+ TV_ID + " has TV_Service: " + TypeOfTV_ID + " - Expected OTT or DTH Only - Aborting Check");
 
-			return;
+			return false;
 		}
 
 		// Check if we have Open EON TV Outage Incident
@@ -125,7 +125,7 @@ public class Outage_For_Massive_TV {
 				// Update Statistics
 				s_dbs.updateUsageStatisticsForMethod("NLU_Active_Pos_IPTV");
 
-				return;
+				return true;
 
 			} catch (Exception e) {
 				e.printStackTrace();
@@ -185,7 +185,7 @@ public class Outage_For_Massive_TV {
 			// Update Statistics
 			s_dbs.updateUsageStatisticsForMethod("NLU_Active_Pos_IPTV");
 
-			return;
+			return true;
 
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -203,5 +203,7 @@ public class Outage_For_Massive_TV {
 
 		// Update Statistics
 		s_dbs.updateUsageStatisticsForMethod("NLU_Active_Neg");
+
+		return false;
 	}
 }
