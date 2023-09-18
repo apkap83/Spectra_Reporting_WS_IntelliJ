@@ -8,6 +8,8 @@ import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 
@@ -197,15 +199,13 @@ public class CLIOutage
 		return null;
 	}
 	public ProductOfNLUActive checkCLIOutage(String RequestID, String CLIProvided, String ServiceType)
-			throws Exception
-	{
+			throws Exception {
 		ProductOfNLUActive ponla = new ProductOfNLUActive();
 		boolean foundAtLeastOneCLIAffected = false;
 		boolean voiceAffected = false;
 		boolean dataAffected = false;
 		boolean iptvAffected = false;
-
-		String allAffectedServices = "";
+		ArrayList<String> allAffectedServices = new ArrayList<>();
 
 		Help_Func hf = new Help_Func();
 
@@ -217,18 +217,13 @@ public class CLIOutage
 		}
 
 		// Check if we have at least one OPEN incident
-		boolean weHaveOpenIncident = s_dbs.checkIfStringExistsInSpecificColumn("SubmittedIncidents", "IncidentStatus",
-				"OPEN");
+		boolean weHaveOpenIncident = s_dbs.checkIfStringExistsInSpecificColumn("SubmittedIncidents",
+				"IncidentStatus", "OPEN");
 
-		// Check number of open incidents
-		String numOfOpenIncidentsCurrently = s_dbs.numberOfRowsFound("SubmittedIncidents",
-				new String[] { "IncidentStatus" }, new String[] { "OPEN" }, new String[] { "String" });
-
-		// If the submitted service type is empty then fill it with "Voice|Data"
-		if (hf.checkIfEmpty("ServiceType", ServiceType))
-		{
-			ServiceType = "Voice|Data|IPTV";
-		}
+		// Services that will be checked
+		// TODO: Input must come from NLU Active method
+		String[] queryForServices;
+		queryForServices = new String[] {"Voice", "Data", "IPTV"};
 
 		logger.info("SysID: " + systemID + " ReqID: " + RequestID + " - Checking CLI Outage CLI: " + CLIProvided + " | " + ServiceType);
 
@@ -236,9 +231,7 @@ public class CLIOutage
 		String delimiterCharacter = "\\|";
 		String[] ServiceTypeSplitted = ServiceType.split(delimiterCharacter);
 
-		logger.debug("ReqID: " + RequestID + " - We have open incidents: " + weHaveOpenIncident);
-
-		// If We do not have at least one opened incident...
+		// No Open Incidents
 		if (!weHaveOpenIncident) {
 			// Update Statistics
 			s_dbs.updateUsageStatisticsForMethod("NLU_Active_Neg");
@@ -248,20 +241,24 @@ public class CLIOutage
 					RequestID, systemID);
 			ucdt.run();
 
-			logger.info(
-					"ReqID: " + RequestID + " - No Service affection for CLI: " + CLIProvided + " | " + ServiceType);
-			//throw new InvalidInputException("No service affection", "Info 425");
+			logger.info("SysID: " + systemID + " ReqID: " + RequestID + " - No Service affection for CLI: "
+					+ CLIProvided + " | " + ServiceType);
+
 			ponla = new ProductOfNLUActive(this.requestID, CLIProvided, "No", "none", "none", "none", "none", "none",
 					"none", "none", "NULL", "NULL", "NULL");
+
+			dbs = null;
+			s_dbs = null;
+			requestID = null;
+
 			return ponla;
 		}
 
-		// String foundHierarchySelected = "";
-		String foundPriority = "";
 
+		// We have at least one opened incident...
+		String foundPriority = "";
 		// String foundOutageAffectedService = "";
 		String foundIncidentID = "";
-
 		String foundScheduled = "";
 		String foundDuration = "";
 		Date foundStartTime = null;
@@ -269,24 +266,23 @@ public class CLIOutage
 		String foundImpact = "";
 		String EndTimeString = null;
 		String foundOutageMsg = "";
-		String foundFlag2_BackupEligible = "";
-		Boolean tofmTV_Result = null;
+		String foundBackupEligible = "";
+		ProductOfNLUActive tofmTV_Result = null;
+		Outage_For_Massive_TV tofmTV = null;
 
-		for (String service : ServiceTypeSplitted)
-		{
-			ResultSet rs = null;
-			// Get Lines with IncidentStatus = "OPEN"
-			rs = s_dbs.getRows("SubmittedIncidents",
-					new String[] { "WillBePublished", "IncidentID", "OutageID", "BackupEligible",
-							"HierarchySelected", "Priority", "AffectedServices", "Scheduled", "Duration",
-							"StartTime", "EndTime", "Impact", "OutageMsg" },
-					new String[] { "IncidentStatus" }, new String[] { "OPEN" }, new String[] { "String" });
+		ResultSet rs = null;
 
-			while (rs.next())
-			{
+		// Get Lines with IncidentStatus = "OPEN" and WillBePublished = "Yes"
+		rs = s_dbs.getRows( "SubmittedIncidents",
+				new String[] { "WillBePublished", "IncidentID", "OutageID", "BackupEligible",
+						"HierarchySelected", "Priority", "AffectedServices", "Scheduled", "Duration",
+						"StartTime", "EndTime", "Impact", "OutageMsg" },
+				new String[] { "WillBePublished", "IncidentStatus" }, new String[] { "Yes", "OPEN" }, new String[] { "String", "String" });
+
+		for (String service: queryForServices) {
+			while (rs.next()) {
 				boolean isOutageWithinScheduledRange = false;
-
-				String WillBePublished = rs.getString("WillBePublished");
+				String rootElementInHierarchy = "";
 				String IncidentID = rs.getString("IncidentID");
 				int OutageID = rs.getInt("OutageID");
 				String HierarchySelected = rs.getString("HierarchySelected");
@@ -300,17 +296,20 @@ public class CLIOutage
 				String OutageMsg = rs.getString("OutageMsg");
 				String BackupEligible = rs.getString("BackupEligible");
 
-				// Ignore Massive Outage Hierarchies
-				if (HierarchySelected.equals("Massive_TV_Outage->TV_Service=ALL_Satellite_Boxes") ||
-						HierarchySelected.equals("Massive_TV_Outage->TV_Service=ALL_EON_Boxes")) {
-					continue;
+				// Backup Eligible response should be "Y" or "N"
+				if (BackupEligible == null) {
+					BackupEligible = "N";
+				} else {
+					if (BackupEligible.equals("Yes")) {
+						BackupEligible = "Y";
+					} else {
+						BackupEligible = "N";
+					}
 				}
 
 				// If it is OPEN & Scheduled & Date(Now) > StartTime then set
 				// isOutageWithinScheduledRange to TRUE
-				if (Scheduled.equals("Yes"))
-				{
-					logger.debug("ReqID: " + RequestID + " - Checking Scheduled Incident: " + IncidentID);
+				if (Scheduled.equals("Yes")) {
 					// Get current date
 					LocalDateTime now = LocalDateTime.now();
 
@@ -323,126 +322,97 @@ public class CLIOutage
 							.atZone(ZoneId.systemDefault()).toLocalDateTime();
 
 					// if Start time is after NOW and End Time is Before NOW then we have outage
-					if (now.isAfter(StartTimeInLocalDateTime) && now.isBefore(EndTimeInLocalDateTime))
-					{
+					if (now.isAfter(StartTimeInLocalDateTime) && now.isBefore(EndTimeInLocalDateTime)) {
 						isOutageWithinScheduledRange = true;
 						logger.debug(
 								"ReqID: " + RequestID + " - Scheduled Incident: " + IncidentID + " is ongoing");
-					} else
-					{
+					} else {
 						isOutageWithinScheduledRange = false;
 						logger.debug(
 								"ReqID: " + RequestID + " - Scheduled Incident: " + IncidentID + " is NOT ongoing");
 						continue;
 					}
-
-					// If the scheduled period (Start Time - End Time) has passed current local time then change the Incident status to "CLOSED"
-					/*  NOT TESTED YET
-					if (now.isAfter(EndTimeInLocalDateTime))
-					{
-						int numOfRowsUpdated = s_dbs.updateColumnOnSpecificCriteria("SubmittedIncidents",
-								new String[] { "IncidentStatus" }, new String[] { "CLOSED" },
-								new String[] { "String" }, new String[] { "IncidentID", "OutageID" },
-								new String[] { IncidentID, String.valueOf(OutageID) },
-								new String[] { "String", "Integer" });
-
-						if (numOfRowsUpdated > 0)
-						{
-							logger.debug("ReqID: " + RequestID + " - Scheduled Incident: " + IncidentID
-									+ " was marked as CLOSED");
-						}
-					}
-					*/
 				}
 
-				// If it is a Massive TV Outage Hierarchy then convert Cli to TV_ID and use Test_Outage_For_Massive_TV Classs
-				if (service.equals("IPTV")) {
-					if (HierarchySelected.equals("Massive_TV_Outage->TV_Service=ALL_Satellite_Boxes") ||
-							HierarchySelected.equals("Massive_TV_Outage->TV_Service=ALL_EON_Boxes")
+				// If it is a Massive TV Outage Hierarchy then convert Cli to TV_ID and use Outage_For_Massive_TV Class
+				if (HierarchySelected.equals("Massive_TV_Outage->TV_Service=ALL_Satellite_Boxes") ||
+						HierarchySelected.equals("Massive_TV_Outage->TV_Service=ALL_EON_Boxes")
 
-					) {
+				) {
+					if (iptvAffected) { continue; } // Already found IPTV Affection
+					if (!outageAffectedService.equals("IPTV")){ continue; } // We care only for IPTV submitted incidents here
 
-						if (WillBePublished.equals("No")) {
-							continue;
+					// Check if Cli Value Exists in our Database
+					if (!dbs.checkIfStringExistsInSpecificColumn("OTT_DTH_Data", "CLI_FIXED", CLIProvided)) {
+						continue;
+					}
+
+					// Get the Value of TV_ID for that CLI Value
+					String TV_ID = dbs.getOneValue("OTT_DTH_Data", "TV_ID", new String[] { "CLI_FIXED" }, new String[] { CLIProvided }, new String[] { "String" });
+					TV_ID = TV_ID.trim();
+
+					if (TV_ID == null || TV_ID.isEmpty()) {
+						logger.warn("SysID: " + systemID + " ReqID: " + RequestID + " - TV_ID is not defined in OTT_DTH_Data Table for Cli Value: "
+								+ CLIProvided);
+						continue;
+					}
+
+					logger.info("SysID: " + systemID + " ReqID: " + RequestID + " - Converting CLI: " + CLIProvided + " --> TV_ID: " + TV_ID);
+
+					tofmTV = new Outage_For_Massive_TV(dbs, s_dbs, RequestID, systemID);
+					tofmTV_Result = tofmTV.checkMassiveTVOutage(RequestID, TV_ID);
+
+					// If There is Massive TV Service Affection Then Publish it
+					if (tofmTV_Result.getAffected().equals("Yes")) {
+						if (Scheduled.equals("No") || (Scheduled.equals("Yes") && isOutageWithinScheduledRange)) {
+							foundIncidentID = tofmTV_Result.getIncidentID();
+							foundPriority = tofmTV.getPriority();
+							foundScheduled = tofmTV_Result.getScheduled();
+							foundDuration = tofmTV_Result.getDuration();
+							foundStartTime = tofmTV.getStartTime();
+							foundEndTime = tofmTV.getEndTime();
+							foundImpact = tofmTV.getImpact();
+							foundOutageMsg = tofmTV.getOutageMsg();
+							foundBackupEligible = BackupEligible;
+
+							foundAtLeastOneCLIAffected = true;
+							iptvAffected = true;
+
+							logger.info("SysID: " + systemID + " ReqID: " + RequestID + " - Found Affected CLI: "
+									+ CLIProvided + " -> TV_ID: " + TV_ID + " from Massive INC: " + tofmTV_Result.getIncidentID()
+									+ " | " + tofmTV.getTypeOfMassiveTVOutage() + " | "
+									+ foundOutageMsg + " | " + BackupEligible);
 						}
-
-						// Check if Cli Value Exists in our Database
-						if (!dbs.checkIfStringExistsInSpecificColumn("OTT_DTH_Data", "CLI_FIXED", CLIProvided)) {
-							continue;
-						}
-
-						// Get the Value of TV_Service for that TV_ID - Possible Values: OTT or DTH
-						String TV_ID = dbs.getOneValue("OTT_DTH_Data", "TV_ID", new String[]{"CLI_FIXED"}, new String[]{CLIProvided}, new String[]{"String"});
-						TV_ID = TV_ID.trim();
-
-						if (TV_ID == null || TV_ID.isEmpty()) {
-							logger.warn("SysID: " + systemID + " ReqID: " + RequestID + " - TV_ID is not defined in OTT_DTH_Data Table for Cli Value: "
-									+ CLIProvided);
-							continue;
-						}
-
-						logger.info("SysID: " + systemID + " ReqID: " + RequestID + " - Converting CLI: " + CLIProvided + " --> TV_ID: " + TV_ID);
-
-						Outage_For_Massive_TV tofmTV = new Outage_For_Massive_TV(dbs, s_dbs, RequestID, systemID);
-						tofmTV_Result = tofmTV.checkMassiveTVOutage(TV_ID);
-
-						// If
-						if (tofmTV_Result) {
-							if (Scheduled.equals("No") || (Scheduled.equals("Yes") && isOutageWithinScheduledRange)) {
-								foundIncidentID = IncidentID;
-								foundPriority = Priority;
-								foundScheduled = Scheduled;
-								foundDuration = Duration;
-								foundStartTime = StartTime;
-								foundEndTime = EndTime;
-								foundImpact = Impact;
-								foundOutageMsg = OutageMsg;
-								foundFlag2_BackupEligible = BackupEligible;
-
-								foundAtLeastOneCLIAffected = true;
-								iptvAffected = true;
-								logger.info("SysID: " + systemID + " ReqID: " + RequestID + " - Found Affected CLI: "
-										+ CLIProvided + " -> TV_ID: " + TV_ID + " | " + "IPTV" + " from Massive Scheduled INC: " + IncidentID
-										+ " | OutageID: " + OutageID + " | " + outageAffectedService + " | "
-										+ foundOutageMsg + " | " + BackupEligible);
-							}
-
-						}
-
-						// Do not perform the rest of the below checks for those 2 Massive Hierarchies
+						// Found affected for service IPTV so now break
 						break;
 					}
+					// Do not perform the below checks for those 2 specific massive hierarchies
+					continue;
 				}
 
-				// if service given in web request is Voice
-				if (outageAffectedService.equals("Voice") && service.equals("Voice"))
-				{
-					// Replace Hierarchy keys from the correct column names of Hierarchy Subscribers
-					// table
+				if (outageAffectedService.equals("Voice") && Arrays.asList(queryForServices).contains("Voice")) {
+					// Replace Hierarchy keys from the correct column names of Hierarchy Subscribers table
 					HierarchySelected = this.replaceHierarchyColumns(HierarchySelected, "Voice");
 
 					// Add CLI Value in Hierarcy
 					HierarchySelected += "->CliValue=" + CLIProvided;
 
 					// Get root hierarchy String
-					String rootElementInHierarchy = hf.getRootHierarchyNode(HierarchySelected);
+					rootElementInHierarchy = hf.getRootHierarchyNode(HierarchySelected);
 
 					// Get Hierarchy Table for that root hierarchy
 					String table = dbs.getOneValue("HierarchyTablePerTechnology2", "VoiceSubscribersTableName",
-							new String[] { "RootHierarchyNode" }, new String[] { rootElementInHierarchy },
-							new String[] { "String" });
+							new String[]{"RootHierarchyNode"}, new String[]{rootElementInHierarchy},
+							new String[]{"String"});
 
 					String numOfRowsFound = dbs.numberOfRowsFound(table, hf.hierarchyKeys(HierarchySelected),
 							hf.hierarchyValues(HierarchySelected), hf.hierarchyStringTypes(HierarchySelected));
 
-					// If matched Hierarchy + CLI matches lines (then those CLIs have actually Outage)
-					if (WillBePublished.equals("Yes"))
+					if (Integer.parseInt(numOfRowsFound) > 0) {
+						foundAtLeastOneCLIAffected = true;
+						voiceAffected = true;
 
-					{
-
-						if (Integer.parseInt(numOfRowsFound) > 0 && Scheduled.equals("No"))
-						{
-
+						if (Scheduled.equals("Yes") && isOutageWithinScheduledRange) {
 							foundIncidentID = IncidentID;
 							foundPriority = Priority;
 							foundScheduled = Scheduled;
@@ -451,65 +421,58 @@ public class CLIOutage
 							foundEndTime = EndTime;
 							foundImpact = Impact;
 							foundOutageMsg = OutageMsg;
-							foundFlag2_BackupEligible = BackupEligible;
+							foundBackupEligible = BackupEligible;
 
-							foundAtLeastOneCLIAffected = true;
-							voiceAffected = true;
-
-							logger.info("SysID: " + systemID + " ReqID: " + RequestID + " - Found Affected CLI: " + CLIProvided + " | "
-									+ ServiceType + " from Non-scheduled INC: " + IncidentID + " | OutageID: "
-									+ OutageID + " | " + outageAffectedService + " | " + foundOutageMsg + " | "
-									+ BackupEligible);
-							break;
-
-						} else if (Integer.parseInt(numOfRowsFound) > 0 && Scheduled.equals("Yes")
-								&& isOutageWithinScheduledRange)
-						{
-							foundIncidentID = IncidentID;
-							foundPriority = Priority;
-							foundScheduled = Scheduled;
-							foundDuration = Duration;
-							foundStartTime = StartTime;
-							foundEndTime = EndTime;
-							foundImpact = Impact;
-							foundOutageMsg = OutageMsg;
-							foundFlag2_BackupEligible = BackupEligible;
-
-							foundAtLeastOneCLIAffected = true;
-							voiceAffected = true;
-							logger.info("SysID: " + systemID + " ReqID: " + RequestID + " - Found Affected CLI: " + CLIProvided + " | "
-									+ ServiceType + " from Scheduled INC: " + IncidentID + " | OutageID: "
-									+ OutageID + " | " + outageAffectedService + " | " + foundOutageMsg + " | "
-									+ BackupEligible);
+							logger.info("SysID: " + systemID + " ReqID: " + RequestID + " - Found Affected CLI: "
+									+ CLIProvided + " from Scheduled INC: " + IncidentID
+									+ " | OutageID: " + OutageID + " | " + outageAffectedService + " | "
+									+ foundOutageMsg + " | " + BackupEligible);
 							break;
 						}
+
+						// Not Scheduled Incident But Affected Service
+						foundIncidentID = IncidentID;
+						foundPriority = Priority;
+						foundScheduled = Scheduled;
+						foundDuration = Duration;
+						foundStartTime = StartTime;
+						foundEndTime = EndTime;
+						foundImpact = Impact;
+						foundOutageMsg = OutageMsg;
+						foundBackupEligible = BackupEligible;
+
+						logger.info("SysID: " + systemID + " ReqID: " + RequestID + " - Found Affected CLI: "
+								+ CLIProvided + " from Non-scheduled INC: " + IncidentID
+								+ " | OutageID: " + OutageID + " | " + outageAffectedService + " | "
+								+ foundOutageMsg + " | " + BackupEligible);
+						break;
 					}
-				} else if (outageAffectedService.equals("Data") && service.equals("Data"))
-				{
-					// Replace Hierarchy keys from the correct column names of Hierarchy Subscribers
-					// table
+				}
+
+				if (outageAffectedService.equals("Data") && Arrays.asList(queryForServices).contains("Data")) {
+					// Replace Hierarchy keys from the correct column names of Hierarchy Subscribers table
 					HierarchySelected = this.replaceHierarchyColumns(HierarchySelected, "Data");
 
 					// Add CLI Value in Hierarcy
 					HierarchySelected += "->CliValue=" + CLIProvided;
 
 					// Get root hierarchy String
-					String rootElementInHierarchy = hf.getRootHierarchyNode(HierarchySelected);
+					rootElementInHierarchy = hf.getRootHierarchyNode(HierarchySelected);
 
 					// Get Hierarchy Table for that root hierarchy
 					String table = dbs.getOneValue("HierarchyTablePerTechnology2", "DataSubscribersTableName",
-							new String[] { "RootHierarchyNode" }, new String[] { rootElementInHierarchy },
-							new String[] { "String" });
+							new String[]{"RootHierarchyNode"}, new String[]{rootElementInHierarchy},
+							new String[]{"String"});
 
 					String numOfRowsFound = dbs.numberOfRowsFound(table, hf.hierarchyKeys(HierarchySelected),
 							hf.hierarchyValues(HierarchySelected), hf.hierarchyStringTypes(HierarchySelected));
 
-					// Scheduled No & Rows Found
-					if (WillBePublished.equals("Yes"))
-
+					if (Integer.parseInt(numOfRowsFound) > 0)
 					{
-						if (Integer.parseInt(numOfRowsFound) > 0 && Scheduled.equals("No"))
-						{
+						foundAtLeastOneCLIAffected = true;
+						dataAffected = true;
+
+						if (Scheduled.equals("Yes") && isOutageWithinScheduledRange) {
 							foundIncidentID = IncidentID;
 							foundPriority = Priority;
 							foundScheduled = Scheduled;
@@ -518,63 +481,58 @@ public class CLIOutage
 							foundEndTime = EndTime;
 							foundImpact = Impact;
 							foundOutageMsg = OutageMsg;
-							foundFlag2_BackupEligible = BackupEligible;
+							foundBackupEligible = BackupEligible;
 
-							foundAtLeastOneCLIAffected = true;
-							dataAffected = true;
-							logger.info("SysID: " + systemID + " ReqID: " + RequestID + " - Found Affected CLI: " + CLIProvided + " | "
-									+ ServiceType + " from Non-scheduled INC: " + IncidentID + " | OutageID: "
-									+ OutageID + " | " + outageAffectedService + " | " + foundOutageMsg + " | "
-									+ BackupEligible);
-							break;
-							// Scheduled Yes & Rows Found & Outage Within Scheduled Range
-						} else if (WillBePublished.equals("Yes") && Integer.parseInt(numOfRowsFound) > 0
-								&& Scheduled.equals("Yes") && isOutageWithinScheduledRange)
-						{
-							foundIncidentID = IncidentID;
-							foundPriority = Priority;
-							foundScheduled = Scheduled;
-							foundDuration = Duration;
-							foundStartTime = StartTime;
-							foundEndTime = EndTime;
-							foundImpact = Impact;
-							foundOutageMsg = OutageMsg;
-							foundFlag2_BackupEligible = BackupEligible;
-
-							foundAtLeastOneCLIAffected = true;
-							dataAffected = true;
-							logger.info("SysID: " + systemID + " ReqID: " + RequestID + " - Found Affected CLI: " + CLIProvided + " | "
-									+ ServiceType + " from Scheduled INC: " + IncidentID + " | OutageID: "
-									+ OutageID + " | " + outageAffectedService + " | " + foundOutageMsg + " | "
-									+ BackupEligible);
+							logger.info("SysID: " + systemID + " ReqID: " + RequestID + " - Found Affected CLI: "
+									+ CLIProvided + " from Scheduled INC: " + IncidentID
+									+ " | OutageID: " + OutageID + " | " + outageAffectedService + " | "
+									+ foundOutageMsg + " | " + BackupEligible);
 							break;
 						}
+
+						// Not Scheduled Incident But Affected Service
+						foundIncidentID = IncidentID;
+						foundPriority = Priority;
+						foundScheduled = Scheduled;
+						foundDuration = Duration;
+						foundStartTime = StartTime;
+						foundEndTime = EndTime;
+						foundImpact = Impact;
+						foundOutageMsg = OutageMsg;
+						foundBackupEligible = BackupEligible;
+
+						logger.info("SysID: " + systemID + " ReqID: " + RequestID + " - Found Affected CLI: "
+								+ CLIProvided + " from Non-scheduled INC: " + IncidentID
+								+ " | OutageID: " + OutageID + " | " + outageAffectedService + " | "
+								+ foundOutageMsg + " | " + BackupEligible);
+						break;
 					}
-				} else if (outageAffectedService.equals("IPTV") && service.equals("IPTV"))
-				{
-					// Replace Hierarchy keys from the correct column names of Hierarchy Subscribers
-					// table
+				}
+
+				if (outageAffectedService.equals("IPTV") && Arrays.asList(queryForServices).contains("IPTV")) {
+					// Replace Hierarchy keys from the correct column names of Hierarchy Subscribers table
 					HierarchySelected = this.replaceHierarchyColumns(HierarchySelected, "IPTV");
 
 					// Add CLI Value in Hierarcy
 					HierarchySelected += "->CliValue=" + CLIProvided;
 
 					// Get root hierarchy String
-					String rootElementInHierarchy = hf.getRootHierarchyNode(HierarchySelected);
+					rootElementInHierarchy = hf.getRootHierarchyNode(HierarchySelected);
 
 					// Get Hierarchy Table for that root hierarchy
 					String table = dbs.getOneValue("HierarchyTablePerTechnology2", "IPTVSubscribersTableName",
-							new String[] { "RootHierarchyNode" }, new String[] { rootElementInHierarchy },
-							new String[] { "String" });
+							new String[]{"RootHierarchyNode"}, new String[]{rootElementInHierarchy},
+							new String[]{"String"});
 
 					String numOfRowsFound = dbs.numberOfRowsFound(table, hf.hierarchyKeys(HierarchySelected),
 							hf.hierarchyValues(HierarchySelected), hf.hierarchyStringTypes(HierarchySelected));
 
-					// Scheduled No & Rows Found
-					if (WillBePublished.equals("Yes"))
+					if (Integer.parseInt(numOfRowsFound) > 0)
 					{
-						if (Integer.parseInt(numOfRowsFound) > 0 && Scheduled.equals("No"))
-						{
+						foundAtLeastOneCLIAffected = true;
+						iptvAffected = true;
+
+						if (Scheduled.equals("Yes") && isOutageWithinScheduledRange) {
 							foundIncidentID = IncidentID;
 							foundPriority = Priority;
 							foundScheduled = Scheduled;
@@ -583,54 +541,44 @@ public class CLIOutage
 							foundEndTime = EndTime;
 							foundImpact = Impact;
 							foundOutageMsg = OutageMsg;
+							foundBackupEligible = BackupEligible;
 
-							foundAtLeastOneCLIAffected = true;
-							iptvAffected = true;
-							logger.info("SysID: " + systemID + " ReqID: " + RequestID + " - Found Affected CLI: " + CLIProvided + " | "
-									+ ServiceType + " from Non-scheduled INC: " + IncidentID + " | OutageID: "
-									+ OutageID + " | " + outageAffectedService + " | " + foundOutageMsg + " | "
-									+ BackupEligible);
-							break;
-							// Scheduled Yes & Rows Found & Outage Within Scheduled Range
-						} else if (WillBePublished.equals("Yes") && Integer.parseInt(numOfRowsFound) > 0
-								&& Scheduled.equals("Yes") && isOutageWithinScheduledRange)
-						{
-							foundIncidentID = IncidentID;
-							foundPriority = Priority;
-							foundScheduled = Scheduled;
-							foundDuration = Duration;
-							foundStartTime = StartTime;
-							foundEndTime = EndTime;
-							foundImpact = Impact;
-							foundOutageMsg = OutageMsg;
-
-							foundAtLeastOneCLIAffected = true;
-							iptvAffected = true;
-							logger.info("SysID: " + systemID + " ReqID: " + RequestID + " - Found Affected CLI: " + CLIProvided + " | "
-									+ ServiceType + " from Scheduled INC: " + IncidentID + " | OutageID: "
-									+ OutageID + " | " + outageAffectedService + " | " + foundOutageMsg + " | "
-									+ BackupEligible);
+							logger.info("SysID: " + systemID + " ReqID: " + RequestID + " - Found Affected CLI: "
+									+ CLIProvided + " from Scheduled INC: " + IncidentID
+									+ " | OutageID: " + OutageID + " | " + outageAffectedService + " | "
+									+ foundOutageMsg + " | " + BackupEligible);
 							break;
 						}
+
+						// Not Scheduled Incident But Affected Service
+						foundIncidentID = IncidentID;
+						foundPriority = Priority;
+						foundScheduled = Scheduled;
+						foundDuration = Duration;
+						foundStartTime = StartTime;
+						foundEndTime = EndTime;
+						foundImpact = Impact;
+						foundOutageMsg = OutageMsg;
+						foundBackupEligible = BackupEligible;
+
+						logger.info("SysID: " + systemID + " ReqID: " + RequestID + " - Found Affected CLI: "
+								+ CLIProvided + " from Non-scheduled INC: " + IncidentID
+								+ " | OutageID: " + OutageID + " | " + outageAffectedService + " | "
+								+ foundOutageMsg + " | " + BackupEligible);
+						break;
 					}
 				}
 
 			}
 		}
 
-		// *************************************
-		// All NLU_Active responses are NEGATIVE
-		// foundAtLeastOneCLIAffected = false;
-		// *************************************
-
 		// CLI is not affected from outage
-		if (!foundAtLeastOneCLIAffected)
-		{
+		if (!foundAtLeastOneCLIAffected) {
 			// Update Statistics
 			s_dbs.updateUsageStatisticsForMethod("NLU_Active_Neg");
 
-			logger.info("ReqID: " + RequestID + " - No Service affection for CLI: " + CLIProvided + " | "
-					+ ServiceType);
+			logger.info("SysID: " + systemID + " ReqID: " + RequestID + " - No Service affection for CLI: "
+					+ CLIProvided + " | " + ServiceType);
 
 			// Update asynchronously - Add Caller to Caller data table (Caller_Data) with empty values for IncidentID, Affected Services & Scheduling
 			Update_CallerDataTable ucdt = new Update_CallerDataTable(dbs, s_dbs, CLIProvided, "", "", "", "", "",
@@ -640,70 +588,36 @@ public class CLIOutage
 			ponla = new ProductOfNLUActive(this.requestID, CLIProvided, "No", "none", "none", "none", "none",
 					"none", "none", "none", "NULL", "NULL", "NULL");
 
-			return ponla;
+			dbs = null;
+			s_dbs = null;
+			requestID = null;
 
+			return ponla; // Spectra Negative Response
 		}
 
-		// Found Affected CLI...
-
-		// Indicate Voice, Data or Voice|Data service affection
-		if (voiceAffected && dataAffected && iptvAffected)
-		{
+		if (voiceAffected)	{
 			// Update Statistics
 			s_dbs.updateUsageStatisticsForMethod("NLU_Active_Pos_Voice");
 
+			allAffectedServices.add("Voice");
+		}
+
+		if (dataAffected) {
 			// Update Statistics
 			s_dbs.updateUsageStatisticsForMethod("NLU_Active_Pos_Data");
 
+			allAffectedServices.add("Data");
+		}
+
+		if (iptvAffected) {
 			// Update Statistics
 			s_dbs.updateUsageStatisticsForMethod("NLU_Active_Pos_IPTV");
 
-			allAffectedServices = "Voice|Data|IPTV";
-		} else if (voiceAffected && dataAffected)
-		{
-			// Update Statistics
-			s_dbs.updateUsageStatisticsForMethod("NLU_Active_Pos_Voice");
-
-			// Update Statistics
-			s_dbs.updateUsageStatisticsForMethod("NLU_Active_Pos_Data");
-
-			allAffectedServices = "Voice|Data";
-		} else if (voiceAffected && iptvAffected)
-		{
-			// Update Statistics
-			s_dbs.updateUsageStatisticsForMethod("NLU_Active_Pos_Voice");
-
-			// Update Statistics
-			s_dbs.updateUsageStatisticsForMethod("NLU_Active_Pos_IPTV");
-
-			allAffectedServices = "Voice|IPTV";
-		} else if (dataAffected && iptvAffected)
-		{
-			// Update Statistics
-			s_dbs.updateUsageStatisticsForMethod("NLU_Active_Pos_Data");
-
-			// Update Statistics
-			s_dbs.updateUsageStatisticsForMethod("NLU_Active_Pos_IPTV");
-
-			allAffectedServices = "Data|IPTV";
-		} else if (voiceAffected)
-		{
-			// Update Statistics
-			s_dbs.updateUsageStatisticsForMethod("NLU_Active_Pos_Voice");
-
-			allAffectedServices = "Voice";
-		} else if (dataAffected)
-		{
-			// Update Statistics
-			s_dbs.updateUsageStatisticsForMethod("NLU_Active_Pos_Data");
-
-			allAffectedServices = "Data";
-		} else if (iptvAffected)
-		{
-			allAffectedServices = "IPTV";
-
-			// Update Statistics
-			s_dbs.updateUsageStatisticsForMethod("NLU_Active_Pos_IPTV");
+			if (tofmTV_Result != null && tofmTV_Result.getAffected().equals("Yes")) {
+				allAffectedServices.add(tofmTV.getTypeOfMassiveTVOutage()); // OTT or DTH
+			} else {
+				allAffectedServices.add("IPTV");
+			}
 		}
 
 		// Get String representation of EndTime Date object
@@ -714,7 +628,7 @@ public class CLIOutage
 			DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 			EndTimeString = dateFormat.format(foundEndTime);
 
-		} else if (foundDuration != null)
+		} else if (foundDuration != null && foundDuration != "NULL")
 		{
 			DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
@@ -728,36 +642,27 @@ public class CLIOutage
 
 		// Update asynchronously Stats_Pos_NLU_Requests to count number of successful NLU requests per CLI
 		Update_ReallyAffectedTable uRat = new Update_ReallyAffectedTable(s_dbs, systemID, foundIncidentID,
-				allAffectedServices, foundScheduled, CLIProvided);
+				String.join("|", allAffectedServices), foundScheduled, CLIProvided);
 		uRat.run();
 
-		// foundFlag2_BackupEligible = Yes -> backupEligible = Y
-		String backupEligible = "";
-		if (foundFlag2_BackupEligible != null)
-		{
-			if (foundFlag2_BackupEligible.equals("Yes"))
-			{
-				backupEligible = "Y";
-			} else if (foundFlag2_BackupEligible.equals("No"))
-			{
-				backupEligible = "N";
-			} else
-			{
-				backupEligible = "N";
-			}
-		} else
-		{
-			backupEligible = "N";
-		}
 
 		// Update asynchronously - Add Caller to Caller data table (Caller_Data) with empty values for IncidentID, Affected Services & Scheduling
 		Update_CallerDataTable ucdt = new Update_CallerDataTable(dbs, s_dbs, CLIProvided, foundIncidentID,
-				allAffectedServices, foundScheduled, foundOutageMsg, backupEligible, RequestID, systemID);
+				String.join("|", allAffectedServices), foundScheduled, foundOutageMsg, foundBackupEligible, RequestID, systemID);
 		ucdt.run();
 
+		// Replace possible OTT or DTH values with IPTV for the SOAP response
+		String replacement = "IPTV";
+
+		for (int i = 0; i < allAffectedServices.size(); i++) {
+			if (allAffectedServices.get(i).equals("OTT") || allAffectedServices.get(i).equals("DTH")) {
+				allAffectedServices.set(i, replacement);
+			}
+		}
+
 		ponla = new ProductOfNLUActive(this.requestID, CLIProvided, "Yes", foundIncidentID, foundPriority,
-				allAffectedServices, foundScheduled, foundDuration, EndTimeString, foundImpact, foundOutageMsg,
-				backupEligible, "NULL");
+				String.join("|", allAffectedServices), foundScheduled, foundDuration, EndTimeString, foundImpact, foundOutageMsg,
+				foundBackupEligible, "NULL");
 
 		dbs = null;
 		s_dbs = null;
@@ -765,5 +670,4 @@ public class CLIOutage
 
 		return ponla;
 	}
-
 }
